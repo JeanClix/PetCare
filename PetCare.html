@@ -186,40 +186,68 @@
         margin-bottom: 0;
       }
 
-      /* ---- Hero / pulse motif ---- */
+      /* ---- Hero con carrusel de fondo ampliado y menor filtro ---- */
       .hero {
-        background:
-          radial-gradient(
-            120% 140% at 88% -10%,
-            rgba(48, 123, 142, 0.3) 0%,
-            transparent 50%
-          ),
-          linear-gradient(160deg, var(--navy) 0%, #184e70 100%);
-        color: #fff;
-        padding: 56px 0 64px;
         position: relative;
+        color: #fff;
+        padding: 88px 0 96px; /* Altura aumentada */
+        overflow: hidden;
+        background-color: var(--navy);
+      }
+      .hero-bg-carousel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+      .hero-bg-slide {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-size: cover;
+        background-position: center;
+        opacity: 0;
+        transition: opacity 1.2s ease-in-out;
+      }
+      .hero-bg-slide.active {
+        opacity: 0.82; /* Mayor visibilidad para las imágenes */
+      }
+      .hero-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          135deg,
+          rgba(16, 58, 87, 0.45) 0%,
+          rgba(11, 19, 32, 0.65) 100%
+        ); /* Filtro azul/oscuro muy ligero */
+        z-index: 2;
       }
       .hero .wrap {
+        position: relative;
+        z-index: 3;
         display: grid;
-        grid-template-columns: 1.15fr 0.85fr;
-        gap: 32px;
+        grid-template-columns: 1fr;
         align-items: center;
-      }
-      @media (max-width: 760px) {
-        .hero .wrap {
-          grid-template-columns: 1fr;
-        }
       }
       .hero h1 {
         color: #fff;
-        font-size: clamp(1.7rem, 3.6vw, 2.5rem);
+        font-size: clamp(1.9rem, 4vw, 2.8rem);
         line-height: 1.15;
-        max-width: 16ch;
+        max-width: 24ch;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
       }
       .hero p.lead {
-        color: #cbd5e1;
-        font-size: 1.05rem;
-        max-width: 44ch;
+        color: #f1f5f9;
+        font-size: 1.1rem;
+        max-width: 50ch;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
       }
       .cta-row {
         display: flex;
@@ -249,23 +277,13 @@
         background: #256574;
       }
       .btn-ghost {
-        border-color: rgba(255, 255, 255, 0.5);
+        border-color: rgba(255, 255, 255, 0.6);
         color: #fff;
-        background: transparent;
+        background: rgba(0, 0, 0, 0.2);
       }
       .btn-ghost:hover {
         border-color: #fff;
-        background: rgba(255, 255, 255, 0.05);
-      }
-      .pulse {
-        width: 100%;
-        height: auto;
-        opacity: 0.9;
-      }
-      .pulse path {
-        fill: none;
-        stroke: var(--pastel);
-        stroke-width: 2.5;
+        background: rgba(0, 0, 0, 0.4);
       }
 
       /* ---- shared section rhythm ---- */
@@ -527,12 +545,18 @@
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
       }
       .prod .ph {
-        aspect-ratio: 1/1;
-        background: linear-gradient(135deg, #e2eef0, #cde3e6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--blue);
+        aspect-ratio: 4/3;
+        overflow: hidden;
+        background: #e2eef0;
+      }
+      .prod .ph img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s;
+      }
+      .prod:hover .ph img {
+        transform: scale(1.05);
       }
       .prod .pb {
         padding: 16px;
@@ -583,6 +607,42 @@
       }
 
       /* ---- servicios ---- */
+      .services-gallery {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 28px;
+      }
+      @media (max-width: 760px) {
+        .services-gallery {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      .service-img-card {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        position: relative;
+        height: 180px;
+      }
+      .service-img-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .service-img-card span {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(16, 58, 87, 0.85);
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 6px 10px;
+        text-align: center;
+      }
+
       .svc-block {
         display: grid;
         grid-template-columns: 0.25fr 1fr;
@@ -695,6 +755,19 @@
         font-size: 0.92rem;
         color: var(--sub);
       }
+      .contact-img-preview {
+        margin-top: 16px;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        height: 150px;
+      }
+      .contact-img-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
       .emergency {
         background: rgba(48, 123, 142, 0.06);
         border: 1px solid rgba(48, 123, 142, 0.2);
@@ -831,9 +904,32 @@
       </div>
     </header>
 
-    <!-- ============ LANDING (Intacto) ============ -->
+    <!-- ============ LANDING ============ -->
     <section class="view active" id="view-landing">
       <div class="hero">
+        <!-- Carrusel de fondo automático de 3 imágenes ampliado -->
+        <div class="hero-bg-carousel">
+          <div
+            class="hero-bg-slide active"
+            style="
+              background-image: url(&quot;https://images.unsplash.com/photo-1548767797-d8c844163c4c?auto=format&fit=crop&w=1200&q=80&quot;);
+            "
+          ></div>
+          <div
+            class="hero-bg-slide"
+            style="
+              background-image: url(&quot;https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?auto=format&fit=crop&w=1200&q=80&quot;);
+            "
+          ></div>
+          <div
+            class="hero-bg-slide"
+            style="
+              background-image: url(&quot;https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=1200&q=80&quot;);
+            "
+          ></div>
+        </div>
+        <div class="hero-overlay"></div>
+
         <div class="wrap">
           <div>
             <h1>
@@ -863,15 +959,6 @@
               >
             </div>
           </div>
-          <svg
-            class="pulse"
-            viewBox="0 0 300 90"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M0 45 H90 L105 15 L125 75 L145 45 L160 45 L175 30 L190 60 L205 45 H300"
-            />
-          </svg>
         </div>
       </div>
 
@@ -1106,6 +1193,38 @@
               post-consulta.
             </p>
           </div>
+
+          <!-- Galería de imágenes de servicios -->
+          <div class="services-gallery">
+            <div class="service-img-card">
+              <img
+                src="https://images.unsplash.com/photo-1576201836106-db1758fd1c97?auto=format&fit=crop&w=400&q=80"
+                alt="Medicina General"
+              />
+              <span>Prevención y Salud</span>
+            </div>
+            <div class="service-img-card">
+              <img
+                src="https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?auto=format&fit=crop&w=400&q=80"
+                alt="Exóticos"
+              />
+              <span>Animales Exóticos</span>
+            </div>
+            <div class="service-img-card">
+              <img
+                src="https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&w=400&q=80"
+                alt="Cirugía y Clínica"
+              />
+              <span>Cirugía e Internamiento</span>
+            </div>
+            <div class="service-img-card">
+              <img
+                src="https://images.unsplash.com/photo-1608748010899-18f33a726665?auto=format&fit=crop&w=400&q=80"
+                alt="Grooming"
+              />
+              <span>Estética y Grooming</span>
+            </div>
+          </div>
         </div>
       </div>
       <div class="section section-white" style="border-bottom: none">
@@ -1202,6 +1321,14 @@
                 </svg>
                 <div><b>Teléfono de atención</b><span>(01) 555-0134</span></div>
               </div>
+
+              <div class="contact-img-preview">
+                <img
+                  src="https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=500&q=80"
+                  alt="Clínica veterinaria interior"
+                />
+              </div>
+
               <div class="emergency">
                 <b>¿Es una emergencia?</b>
                 <p style="margin: 4px 0 12px; font-size: 0.9rem">
@@ -1282,61 +1409,81 @@
           b.addEventListener("click", () => switchView(b.dataset.view)),
         );
 
-      // ---- product catalog ----
+      // ---- Carrusel automático del Hero (Inicio) ----
+      let currentSlide = 0;
+      const slides = document.querySelectorAll(".hero-bg-slide");
+      function nextHeroSlide() {
+        if (slides.length === 0) return;
+        slides[currentSlide].classList.remove("active");
+        currentSlide = (currentSlide + 1) % slides.length;
+        slides[currentSlide].classList.add("active");
+      }
+      setInterval(nextHeroSlide, 4500);
+
+      // ---- product catalog con imágenes estables de alta calidad ----
       const products = [
         {
           name: "Alimento seco premium adulto",
           pet: "perro",
           cat: "alimento",
           price: "S/ 165.00",
+          img: "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?auto=format&fit=crop&w=400&q=80",
         },
         {
           name: "Alimento húmedo gourmet",
           pet: "gato",
           cat: "alimento",
           price: "S/ 58.00",
+          img: "https://images.unsplash.com/photo-1563460718536-e822453c89f5?auto=format&fit=crop&w=400&q=80",
         },
         {
           name: "Dieta prescripción renal",
           pet: "gato",
           cat: "alimento",
           price: "S/ 189.00",
+          img: "https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=400&q=80",
         },
         {
           name: "Sustrato terrario reptiles",
           pet: "exotico",
           cat: "accesorio",
           price: "S/ 52.00",
+          img: "https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?auto=format&fit=crop&w=400&q=80",
         },
         {
           name: "Suplemento articular",
           pet: "perro",
           cat: "farmacia",
           price: "S/ 79.00",
+          img: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80",
         },
         {
           name: "Antiparasitario tópico",
           pet: "gato",
           cat: "farmacia",
           price: "S/ 48.00",
+          img: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=400&q=80",
         },
         {
           name: "Comedero automático",
           pet: "perro",
           cat: "accesorio",
           price: "S/ 135.00",
+          img: "https://images.unsplash.com/photo-1541599540903-216a46ca1dc0?auto=format&fit=crop&w=400&q=80",
         },
         {
           name: "Vitaminas para aves",
           pet: "exotico",
           cat: "farmacia",
           price: "S/ 55.00",
+          img: "https://images.unsplash.com/photo-1550948537-1d8a13fba89b?auto=format&fit=crop&w=400&q=80",
         },
         {
           name: "Alimento premium cachorro",
           pet: "perro",
           cat: "alimento",
           price: "S/ 172.00",
+          img: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&w=400&q=80",
         },
       ];
       const grid = document.getElementById("prod-grid");
@@ -1353,7 +1500,7 @@
             .map(
               (p) => `
     <div class="prod" data-cat="${p.cat}">
-      <div class="ph" style="background:linear-gradient(135deg,${p.pet === "exotico" ? "#f0f7f5,#d6e8e2" : p.pet === "gato" ? "#e2eef0,#cce0e3" : "#edf3f5,#d8e4e8"});"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${p.pet === "exotico" ? "#366B2B" : p.pet === "gato" ? "#307B8E" : "#103A57"}" stroke-width="1.4"><path d="M12 2C8 6 6 9 6 13a6 6 0 0012 0c0-4-2-7-6-11z"/></svg></div>
+      <div class="ph"><img src="${p.img}" alt="${p.name}"></div>
       <div class="pb">
         <div class="tag">${p.pet.charAt(0).toUpperCase() + p.pet.slice(1)} · ${p.cat}</div>
         <h3>${p.name}</h3>
