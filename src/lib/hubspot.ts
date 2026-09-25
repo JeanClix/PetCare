@@ -23,6 +23,9 @@ export const consentText =
   "Autorizo a Gabus Vet S.A.C. a tratar mis datos personales para gestionar mi solicitud, conforme a la Ley N.° 29733 y su política de privacidad.";
 export const marketingText = "Quiero recibir recordatorios de vacunas, promociones y consejos por correo.";
 
+/** Teléfono peruano en formato internacional (+51…), como lo guarda el campo con código de país de HubSpot */
+export const toHubSpotPhone = (phone: string) => `+51${phone.replace(/\D/g, "").replace(/^0/, "")}`;
+
 declare global {
   interface Window {
     _hsq?: unknown[][];

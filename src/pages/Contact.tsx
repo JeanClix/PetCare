@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/Form";
 import type { Pet } from "@/data/products";
 import { business, photos, services } from "@/data/site";
-import { hubspot, submitHubSpotForm } from "@/lib/hubspot";
+import { hubspot, submitHubSpotForm, toHubSpotPhone } from "@/lib/hubspot";
 import { whatsappLink } from "@/lib/utils";
 
 type Status =
@@ -87,7 +87,7 @@ export function Contact() {
         firstname: get("firstname"),
         lastname: get("lastname"),
         email: get("email"),
-        phone: get("phone").replace(/\D/g, ""),
+        phone: toHubSpotPhone(get("phone")),
         tipo_mascota: get("tipo_mascota"),
         nombre_mascota: get("nombre_mascota"),
         servicio_interes: get("servicio_interes"),

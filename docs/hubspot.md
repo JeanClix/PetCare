@@ -2,7 +2,7 @@
 
 La web ya tiene la integración programada (`src/lib/hubspot.ts`). Cada parte se activa sola cuando su valor está en `.env.production`; mientras tanto, esa parte sigue funcionando con WhatsApp.
 
-**Estado actual:** el código de seguimiento ya está activo (Hub ID `52059776`, región `na1`). Faltan los formularios, la agenda y, opcionalmente, la suscripción de marketing.
+**Estado actual:** el código de seguimiento ya está activo (Hub ID `52059776`, región `na1`). El formulario de citas también (`a9e003a0-…`). Faltan el formulario de pedidos, la agenda y, opcionalmente, la suscripción de marketing.
 
 Todos los datos que se piden aquí son **públicos** (terminan en el navegador del visitante). Nunca pongas en `.env` ni compartas en el chat un token de "app privada" de HubSpot.
 
