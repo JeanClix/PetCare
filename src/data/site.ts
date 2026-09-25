@@ -1,3 +1,5 @@
+import { asset } from "@/lib/asset";
+
 // Información real de PetCare Perú (petcareperu.com)
 export const business = {
   name: "PetCare",
@@ -161,16 +163,16 @@ export const photos = {
 
 // Logos descargados de petcareperu.com/marcas
 export const brands = [
-  { name: "Brit", logo: "/img/brands/brit.png" },
-  { name: "Bayer", logo: "/img/brands/bayer.png" },
-  { name: "Beaphar", logo: "/img/brands/beaphar.png" },
-  { name: "Bravecto", logo: "/img/brands/bravecto.png" },
-  { name: "Cat-Licious", logo: "/img/brands/cat-licious.png" },
-  { name: "Canbo", logo: "/img/brands/canbo.png" },
-  { name: "Aranda Pets", logo: "/img/brands/aranda-pets.png" },
-  { name: "Brouwer", logo: "/img/brands/brouwer.png" },
-  { name: "Cat Zone", logo: "/img/brands/cat-zone.png" },
-  { name: "Biomont", logo: "/img/brands/biomont.jpg" },
+  { name: "Brit", logo: asset("/img/brands/brit.png") },
+  { name: "Bayer", logo: asset("/img/brands/bayer.png") },
+  { name: "Beaphar", logo: asset("/img/brands/beaphar.png") },
+  { name: "Bravecto", logo: asset("/img/brands/bravecto.png") },
+  { name: "Cat-Licious", logo: asset("/img/brands/cat-licious.png") },
+  { name: "Canbo", logo: asset("/img/brands/canbo.png") },
+  { name: "Aranda Pets", logo: asset("/img/brands/aranda-pets.png") },
+  { name: "Brouwer", logo: asset("/img/brands/brouwer.png") },
+  { name: "Cat Zone", logo: asset("/img/brands/cat-zone.png") },
+  { name: "Biomont", logo: asset("/img/brands/biomont.jpg") },
 ];
 
 // Testimonios de ejemplo para el proyecto del curso

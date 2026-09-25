@@ -13,6 +13,16 @@ npm run build    # compilación a dist/
 npm run preview  # sirve la versión compilada
 ```
 
+## Publicar en GitHub Pages
+
+Cada push a `main` compila y publica la web con `.github/workflows/deploy.yml`.
+
+1. La primera vez: en el repositorio, *Settings > Pages > Build and deployment > Source*, elige **GitHub Actions**.
+2. Haz push a `main`. El avance se ve en la pestaña *Actions*.
+3. La web queda en `https://jeanclix.github.io/PetCare/`.
+
+Para activar HubSpot en la versión publicada, crea las variables `VITE_HUBSPOT_*` de `.env.example` en *Settings > Secrets and variables > Actions > Variables* y vuelve a ejecutar el workflow. Son IDs públicos, por eso van como *Variables* y no como *Secrets*.
+
 ## Páginas
 
 | Ruta          | Contenido                                                                 |
@@ -25,9 +35,15 @@ npm run preview  # sirve la versión compilada
 
 El carrito se guarda en el navegador y **el pedido se finaliza por WhatsApp** con el detalle ya escrito. Cualquier otra ruta muestra una página 404.
 
-### HubSpot
+### HubSpot (CRM)
 
-El botón flotante de WhatsApp se retiró para dejar ese espacio al chat de HubSpot. Para integrarlo, pega el código de seguimiento de HubSpot antes de `</body>` en `index.html`. El formulario de `/contacto` (`src/pages/Contact.tsx`) es el candidato natural a reemplazar por un formulario de HubSpot.
+La integración ya está programada en `src/lib/hubspot.ts` y se activa con variables de entorno (`.env.example`):
+
+- Seguimiento de visitas y fuentes, incluida la navegación interna de la web.
+- Formulario de citas enviado a HubSpot con datos del dueño y de la mascota, consentimiento (Ley N.° 29733) y agenda de Meetings al terminar.
+- Pedidos de la tienda registrados en HubSpot (detalle y monto) antes de coordinar por WhatsApp.
+
+Sin configurar, todo funciona con WhatsApp como respaldo. Qué sacar de HubSpot y cómo: **[docs/hubspot.md](docs/hubspot.md)**. Los 54 productos para importar están en `docs/hubspot-productos.csv`.
 
 ## Paleta (extraída del logo)
 

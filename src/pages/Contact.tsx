@@ -123,35 +123,37 @@ export function Contact() {
                 <OwnerFields errors={errors} />
               </fieldset>
 
-              <fieldset className="space-y-5 border-t border-border pt-6">
-                <legend className="float-left mb-5 w-full font-display text-xl font-black">Tu mascota</legend>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <Field label="Nombre de tu mascota" name="nombre_mascota" hint="Opcional">
-                    <input id="nombre_mascota" name="nombre_mascota" placeholder="Toby" className={inputClass} />
+              <div className="border-t border-border pt-6">
+                <fieldset className="space-y-5">
+                  <legend className="mb-5 font-display text-xl font-black">Tu mascota</legend>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <Field label="Nombre de tu mascota" name="nombre_mascota" hint="Opcional">
+                      <input id="nombre_mascota" name="nombre_mascota" placeholder="Toby" className={inputClass} />
+                    </Field>
+                    <Field label="Es un" name="tipo_mascota">
+                      <select id="tipo_mascota" name="tipo_mascota" defaultValue="perro" className={inputClass}>
+                        {petOptions.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Servicio" name="servicio_interes" className="sm:col-span-2">
+                      <select id="servicio_interes" name="servicio_interes" key={preselected} defaultValue={preselected} className={inputClass}>
+                        {services.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                  <Field label="Mensaje" name="message" hint="Opcional. Cuéntanos qué necesita tu engreído.">
+                    <textarea id="message" name="message" rows={3} className={`${inputClass} h-auto resize-y py-3`} />
                   </Field>
-                  <Field label="Es un" name="tipo_mascota">
-                    <select id="tipo_mascota" name="tipo_mascota" defaultValue="perro" className={inputClass}>
-                      {petOptions.map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Servicio" name="servicio_interes" className="sm:col-span-2">
-                    <select id="servicio_interes" name="servicio_interes" key={preselected} defaultValue={preselected} className={inputClass}>
-                      {services.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
-                <Field label="Mensaje" name="message" hint="Opcional. Cuéntanos qué necesita tu engreído.">
-                  <textarea id="message" name="message" rows={3} className={`${inputClass} h-auto resize-y py-3`} />
-                </Field>
-              </fieldset>
+                </fieldset>
+              </div>
 
               <ConsentFields error={errors.consent} />
 

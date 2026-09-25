@@ -1,3 +1,4 @@
+import { asset } from "@/lib/asset";
 import raw from "./products.json";
 
 export type Pet = "perro" | "gato" | "exotico";
@@ -17,7 +18,7 @@ export interface Product {
 }
 
 // Catálogo extraído de petcareperu.com (API pública de WooCommerce)
-export const products = raw as Product[];
+export const products = (raw as Product[]).map((p) => ({ ...p, image: asset(p.image) }));
 
 export const petLabels: Record<Pet, string> = {
   perro: "Perros",

@@ -27,6 +27,7 @@ export function CartDrawer() {
   const [step, setStep] = useState<Step>("cart");
   const [errors, setErrors] = useState<ContactErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [orderWhatsapp, setOrderWhatsapp] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -85,7 +86,10 @@ export function CartDrawer() {
       setStep("checkout");
       return;
     }
-    window.open(whatsappLink(`${orderMessage}\nA nombre de: ${get("firstname")} ${get("lastname")}`), "_blank", "noopener");
+    // Safari puede bloquear esta ventana por abrirse tras la espera; el panel final repite el enlace
+    const link = whatsappLink(`${orderMessage}\nA nombre de: ${get("firstname")} ${get("lastname")}`);
+    window.open(link, "_blank", "noopener");
+    setOrderWhatsapp(link);
     clear();
     setStep("done");
   }
@@ -116,10 +120,13 @@ export function CartDrawer() {
             <div>
               <p className="font-display text-xl font-black">Registramos tu pedido</p>
               <p className="mt-1.5 text-sm text-muted-foreground">
-                Abrimos WhatsApp para coordinar el pago y el recojo o la entrega.
+                Coordinemos el pago y el recojo o la entrega por WhatsApp. Si no se abrió, usa este botón.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={close}>
+            <ButtonAnchor href={orderWhatsapp} variant="whatsapp">
+              <WhatsappLogo weight="fill" /> Abrir WhatsApp
+            </ButtonAnchor>
+            <Button variant="ghost" size="sm" onClick={close}>
               Seguir navegando
             </Button>
           </div>

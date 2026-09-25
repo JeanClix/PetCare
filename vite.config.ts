@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
 export default defineConfig({
+  // Base relativa: con el router por hash, el build funciona en la raíz de un dominio o en una subcarpeta (GitHub Pages)
+  base: "./",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "src") },
