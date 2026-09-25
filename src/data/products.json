@@ -1,0 +1,748 @@
+[
+ {
+  "id": 3963,
+  "name": "Omegapel - Suplemento Nutricional",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 54.0,
+  "priceMax": null,
+  "image": "/img/products/3963.jpg",
+  "description": ""
+ },
+ {
+  "id": 3962,
+  "name": "Hematolic - Suplemento Nutricional",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 48.0,
+  "priceMax": null,
+  "image": "/img/products/3962.jpg",
+  "description": "Suplemento nutricional con vitaminas y minerales."
+ },
+ {
+  "id": 3510,
+  "name": "Hexocleen-micox - Shampoo Antimicótico antiséptico x 240ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Antimicóticos",
+  "price": 68.0,
+  "priceMax": null,
+  "image": "/img/products/3510.jpg",
+  "description": "Hexocleen-micox - Shampoo Antimicótico antiséptico x 240ml."
+ },
+ {
+  "id": 3073,
+  "name": "Epitelizante ocular oftalday - ungüento oftálmico estéril",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Oftálmicos",
+  "price": 80.0,
+  "priceMax": null,
+  "image": "/img/products/3073.jpg",
+  "description": "Descripción:\nUngüento oftálmico a base de Vitaminas A y E e Hidrolizado de Caseina.\npresentación.\nPomo conteniendo 3,5 g, con aplicador oftálmico.\nAcción:\nReconstituyente. Estimulante de la actividad regenerativa de la c"
+ },
+ {
+  "id": 3061,
+  "name": "Cicatrizante ocular con antibióticos 5gr",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Oftálmicos",
+  "price": 84.5,
+  "priceMax": null,
+  "image": "/img/products/3061.jpg",
+  "description": "Combina la acción antibiótica de amplio espectro de la Gentamicina y de la Neomicina con la acción epitelizante y de regeneración de tejidos propia de las vitaminas A y D y los aminoácidos de la formulación. Sus excipien"
+ },
+ {
+  "id": 2870,
+  "name": "Nukhan Perros - Envase 500gr - Sachet 50gr",
+  "pets": [
+   "perro"
+  ],
+  "category": "alimento",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 30.0,
+  "priceMax": 155.0,
+  "image": "/img/products/2870.png",
+  "description": "Nukhan Perros - Envase 500gr - Sachet 50gr."
+ },
+ {
+  "id": 2867,
+  "name": "Nukhan Gatos - Envase 200gr - Sachet 50gr",
+  "pets": [
+   "gato"
+  ],
+  "category": "alimento",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 30.0,
+  "priceMax": 85.0,
+  "image": "/img/products/2867.jpg",
+  "description": "Nukhan Gatos - Envase 200gr - Sachet 50gr."
+ },
+ {
+  "id": 2817,
+  "name": "Esencias Florales Rescate Gotas 30ml",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 42.0,
+  "priceMax": null,
+  "image": "/img/products/2817.jpg",
+  "description": "Esencias Florales Rescate Gotas 30ml."
+ },
+ {
+  "id": 2816,
+  "name": "Esencias Florales Miedo Gotas 30ml",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 42.0,
+  "priceMax": null,
+  "image": "/img/products/2816.jpg",
+  "description": "Esencias Florales Miedo Gotas 30ml."
+ },
+ {
+  "id": 2815,
+  "name": "Esencias Florales Stress Gotas 30ml",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 42.0,
+  "priceMax": null,
+  "image": "/img/products/2815.jpg",
+  "description": "Esencias Florales estres Gotas 30ml."
+ },
+ {
+  "id": 2813,
+  "name": "Esencias Florales Armonizar Gotas 30ml",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 42.0,
+  "priceMax": null,
+  "image": "/img/products/2813.jpg",
+  "description": "Esencias Florales Armonizar Gotas 30ml."
+ },
+ {
+  "id": 2812,
+  "name": "Esencias Florales Ansiedad Gotas 30ml",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 42.0,
+  "priceMax": null,
+  "image": "/img/products/2812.jpg",
+  "description": "Esencias Florales Ansiedad Gotas 30ml."
+ },
+ {
+  "id": 2811,
+  "name": "Esencias Florales Agresividad Gotas 30ml",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 42.0,
+  "priceMax": null,
+  "image": "/img/products/2811.jpg",
+  "description": "Esencias Florales Agresividad Gotas 30ml."
+ },
+ {
+  "id": 2795,
+  "name": "Proteliv Gotas 15ml Hepatoprotector",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 60.0,
+  "priceMax": null,
+  "image": "/img/products/2795.jpg",
+  "description": "Proteliv Gotas 15ml Hepatoprotector."
+ },
+ {
+  "id": 2794,
+  "name": "Proteliv - Hepatoprotector 21 Comprimidos",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 80.0,
+  "priceMax": null,
+  "image": "/img/products/2794.jpg",
+  "description": "Proteliv - Hepatoprotector 21 Comprimidos."
+ },
+ {
+  "id": 2786,
+  "name": "Clorhexidina - Odontológico Gel Antiplaca 20ml",
+  "pets": [
+   "perro"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 42.0,
+  "priceMax": null,
+  "image": "/img/products/2786.jpg",
+  "description": "Clorhexidina -Odontológico Gel Antiplaca 20ml."
+ },
+ {
+  "id": 2785,
+  "name": "Cardial 5mg 30 Comprimidos Cardioprotector",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 125.0,
+  "priceMax": null,
+  "image": "/img/products/2785.jpg",
+  "description": "Cardial 5mg 30 Comprimidos Cardioprotector."
+ },
+ {
+  "id": 2784,
+  "name": "Apetil Suspención oral 10ml Anabolico - estimulante de apetito",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 59.0,
+  "priceMax": null,
+  "image": "/img/products/2784.jpg",
+  "description": "Apetil Suspención oral 10ml Anabolico - estimulante de apetito."
+ },
+ {
+  "id": 2652,
+  "name": "Fooey Spray 4 oz",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 43.0,
+  "priceMax": null,
+  "image": "/img/products/2652.jpg",
+  "description": "Fooey Spray 4 oz."
+ },
+ {
+  "id": 2647,
+  "name": "Dental Fresh Whitening Dog 8 oz y 17 oz",
+  "pets": [
+   "perro"
+  ],
+  "category": "higiene",
+  "subcategory": "Higiene dental",
+  "price": 68.0,
+  "priceMax": 90.5,
+  "image": "/img/products/2647.jpg",
+  "description": "Dental Fresh Whitening Dog 8 oz y 17 oz."
+ },
+ {
+  "id": 2644,
+  "name": "Dental Fresh Original Dog 8 oz y 17.3oz",
+  "pets": [
+   "perro"
+  ],
+  "category": "higiene",
+  "subcategory": "Higiene dental",
+  "price": 64.0,
+  "priceMax": 85.5,
+  "image": "/img/products/2644.jpg",
+  "description": "Dental Fresh Original Dog 8 oz y 17.3oz."
+ },
+ {
+  "id": 2643,
+  "name": "Dental Fresh Original Cat 8 oz",
+  "pets": [
+   "gato"
+  ],
+  "category": "higiene",
+  "subcategory": "Higiene dental",
+  "price": 62.0,
+  "priceMax": null,
+  "image": "/img/products/2643.jpg",
+  "description": "Dental Fresh Original Cat 8 oz."
+ },
+ {
+  "id": 2559,
+  "name": "Play Spray Catnip 150ml",
+  "pets": [
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 49.5,
+  "priceMax": null,
+  "image": "/img/products/2559.jpg",
+  "description": "Play Spray Catnip 150ml."
+ },
+ {
+  "id": 2549,
+  "name": "Catnip Bits 35gr",
+  "pets": [
+   "gato"
+  ],
+  "category": "alimento",
+  "subcategory": "Snacks",
+  "price": 13.5,
+  "priceMax": null,
+  "image": "/img/products/2549.jpg",
+  "description": "Catnip Bits 35gr."
+ },
+ {
+  "id": 2518,
+  "name": "Advantage Gato 1 x 0.4ml Gatos menores a 4kg - BAYER",
+  "pets": [
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Antiparasitarios",
+  "price": 39.0,
+  "priceMax": null,
+  "image": "/img/products/2518.jpg",
+  "description": "Advantage Gato 1 x 0.4ml Gatos menores a 4kg - BAYER."
+ },
+ {
+  "id": 2514,
+  "name": "Advantage Gato 1 x 0.8ml Gatos mayores a 4kg - BAYER",
+  "pets": [
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Antiparasitarios",
+  "price": 52.0,
+  "priceMax": null,
+  "image": "/img/products/2514.jpg",
+  "description": "Advantaje Gato 1 x 0.8ml Gatos mayores a 4kg - BAYER."
+ },
+ {
+  "id": 2468,
+  "name": "Ceruline x 120ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Óticos",
+  "price": 46.0,
+  "priceMax": null,
+  "image": "/img/products/2468.jpg",
+  "description": "Ceruline x 120ml.\nLimpiador ótico de Ac. bórico 2g acético 2g salicílico 1g en 100ml."
+ },
+ {
+  "id": 2467,
+  "name": "Hexocleen Spray x 120ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 45.0,
+  "priceMax": null,
+  "image": "/img/products/2467.jpg",
+  "description": "Hexocleen Spray x 120ml.\nSolución tópica clorhexidina 2%."
+ },
+ {
+  "id": 2466,
+  "name": "Hexocleen Shampoo x 240ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "higiene",
+  "subcategory": "Shampoo medicado",
+  "price": 48.0,
+  "priceMax": null,
+  "image": "/img/products/2466.jpg",
+  "description": "Hexocleen Shampoo x 240ml.\nShampoo de clorhexidina 2%."
+ },
+ {
+  "id": 2465,
+  "name": "Sin Spot x 20 ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Cremas y ungüentos",
+  "price": 41.0,
+  "priceMax": null,
+  "image": "/img/products/2465.jpg",
+  "description": "Sin Spot x 20 ml.\nSolución quitamanchas para limpiar zona lacrimal."
+ },
+ {
+  "id": 2463,
+  "name": "Keracleen Shampoo x 240ml",
+  "pets": [
+   "perro"
+  ],
+  "category": "higiene",
+  "subcategory": "Shampoo medicado",
+  "price": 48.0,
+  "priceMax": null,
+  "image": "/img/products/2463.jpg",
+  "description": "Keracleen Shampoo x 240ml.\nShampoo queratolítico de azufre y ácido salicílico."
+ },
+ {
+  "id": 2451,
+  "name": "Gentax Ótico x 15 ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Óticos",
+  "price": 38.0,
+  "priceMax": null,
+  "image": "/img/products/2451.jpg",
+  "description": "Gentax Ótico x 15 ml.\nSolución ótica con gentamicina betametasona y clotrimazol."
+ },
+ {
+  "id": 2436,
+  "name": "Methigel x 4.25oz",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 53.0,
+  "priceMax": null,
+  "image": "/img/products/2436.jpg",
+  "description": "Methigel x 4.25oz.\nDL metionina acidificante de orina."
+ },
+ {
+  "id": 2433,
+  "name": "Laxatone 2.5oz y 4.25oz",
+  "pets": [
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Farmacia",
+  "price": 47.0,
+  "priceMax": 67.0,
+  "image": "/img/products/2433.jpg",
+  "description": "Laxatone 2.5oz y 4.25oz.\nLaxante, lubricante en base petrolato para gatos."
+ },
+ {
+  "id": 2396,
+  "name": "Nutri cal x 4.25oz",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 53.0,
+  "priceMax": null,
+  "image": "/img/products/2396.jpg",
+  "description": "Nutri cal x 4.25oz.\nSuplemento energético, omega 3."
+ },
+ {
+  "id": 2393,
+  "name": "Ocubiotic colirio x 5ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Oftálmicos",
+  "price": 54.0,
+  "priceMax": null,
+  "image": "/img/products/2393.jpg",
+  "description": "Ocubiotic colirio x 5ml.\nColirio antibiótico neomicina polimixina bacitracina benzocaína."
+ },
+ {
+  "id": 2392,
+  "name": "Ocubiotic colirio con esteroides x 5ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Oftálmicos",
+  "price": 54.0,
+  "priceMax": null,
+  "image": "/img/products/2392.jpg",
+  "description": "Ocubiotic colirio con esteroides x 5ml.\nColirio antibiótico con esteroides (antibiótico antiinflamatorio) neomicina polimixina bacitracina benzocaína hidrocortisona."
+ },
+ {
+  "id": 2391,
+  "name": "Tears Lágrimas x 8ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Oftálmicos",
+  "price": 61.0,
+  "priceMax": null,
+  "image": "/img/products/2391.jpg",
+  "description": "Tears Lágrimas x 8ml.\nSustituto de lágrimas colabora con la cicatrización. Antiinflamatorio (coadyuvante) hidratante con condroitín para ojo seco."
+ },
+ {
+  "id": 2390,
+  "name": "Tobramax x 5ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Oftálmicos",
+  "price": 67.0,
+  "priceMax": null,
+  "image": "/img/products/2390.jpg",
+  "description": "Tobramax x 5ml.\nColirio antibiótico antiinflamatorio. Tobramicina y condroitín para úlceras corneales."
+ },
+ {
+  "id": 2389,
+  "name": "Ciprovet x 5ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Oftálmicos",
+  "price": 85.0,
+  "priceMax": null,
+  "image": "/img/products/2389.jpg",
+  "description": "Ciprovet x 5ml.\nColirio cicatrizante y antibacteriano ciprofloxacina y condroitín para úlceras corneales."
+ },
+ {
+  "id": 2383,
+  "name": "Trihepat x 100ml",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 72.3,
+  "priceMax": null,
+  "image": "/img/products/2383.jpg",
+  "description": "Trihepat x 100ml.\nReparador y protector hepático metionina colina y silimarina."
+ },
+ {
+  "id": 2365,
+  "name": "Crema 6A - 15gr y 30gr",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Dermatológicos",
+  "price": 36.0,
+  "priceMax": 60.0,
+  "image": "/img/products/2365.jpg",
+  "description": "Crema 6A - 15gr y 30gr.\nCrema antibiótica, antifúngica, antiinflamatoria, antipruriginosa, antialérgica, anestésica. Contiene neomicina bacitracina."
+ },
+ {
+  "id": 2356,
+  "name": "Transportador Vari Kennel ULT FASH MED",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "accesorio",
+  "subcategory": "Transportadores",
+  "price": 466.0,
+  "priceMax": null,
+  "image": "/img/products/2356.jpg",
+  "description": "Transportador Vari Kennel ULT FASH MED.\n71 x 52 x 54 (11 - 13 kg)"
+ },
+ {
+  "id": 2355,
+  "name": "Transportador Vari Kennel fashion pequeño",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "accesorio",
+  "subcategory": "Transportadores",
+  "price": 314.0,
+  "priceMax": null,
+  "image": "/img/products/2355.jpg",
+  "description": "Transportador Vari Kennel fashion pequeño.\n61 x 42 x 37 (hasta 9kg)"
+ },
+ {
+  "id": 2350,
+  "name": "Glicopan Pet 30ml y 125ml",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 43.0,
+  "priceMax": 67.0,
+  "image": "/img/products/2350.jpg",
+  "description": "Glicopan Pet.\nSuplemento líquido de aminoácidos y vitaminas del complejo B para caninos, felinos, mustélidos, aves, roedores y reptiles. Ayuda a mejorar el estado general en animales con estado nutricional inadecuado. Es"
+ },
+ {
+  "id": 2347,
+  "name": "Hemolitan Pet 30ml y 60ml",
+  "pets": [
+   "perro",
+   "gato",
+   "exotico"
+  ],
+  "category": "farmacia",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 46.0,
+  "priceMax": 72.0,
+  "image": "/img/products/2347.jpg",
+  "description": "Hemolitan Pet\nSuplemento de vitaminas y minerales para caninos, felinos, mustélidos, aves, roedores y reptiles. Ideal para procesos de desnutrición, anemia convalescencia y para todas las fases de crecimiento de los anim"
+ },
+ {
+  "id": 2309,
+  "name": "Ecaderm Spray",
+  "pets": [
+   "perro",
+   "gato"
+  ],
+  "category": "farmacia",
+  "subcategory": "Óticos",
+  "price": 36.0,
+  "priceMax": 64.0,
+  "image": "/img/products/2309.jpg",
+  "description": "Ecaderm Spray.\nSolución bactericida, viricida y fungicida de amplio espectro para el tratamiento de problemas dermatológicos, cicatrización de heridas, asepsia del campo quirúrgico y cavidades, higiene auricular y bucal."
+ },
+ {
+  "id": 2304,
+  "name": "Pet Tab Plus x 60 tabletas",
+  "pets": [
+   "perro"
+  ],
+  "category": "farmacia",
+  "subcategory": "Suplementos y vitaminas",
+  "price": 91.1,
+  "priceMax": null,
+  "image": "/img/products/2304.jpg",
+  "description": "Pet Tab Plus x 60 tabletas.\nEs el suplemento vitamínico (13 vitaminas) y mineral (11 minerales) que garantiza el suplir las necesidades vitamínicas y mineral con la más alta palatabilidad para perros."
+ },
+ {
+  "id": 2233,
+  "name": "Hill’s Science Diet Adult Light 30 lb",
+  "pets": [
+   "perro"
+  ],
+  "category": "alimento",
+  "subcategory": "Alimento seco",
+  "price": 415.0,
+  "priceMax": null,
+  "image": "/img/products/2233.jpg",
+  "description": "Hill’s Science Diet Adult Light 30 lb.\nBolsa de 13.6kg."
+ },
+ {
+  "id": 2228,
+  "name": "Hill’s Science Diet Adult Large Breed Lamb & Rice 33 lb",
+  "pets": [
+   "perro"
+  ],
+  "category": "alimento",
+  "subcategory": "Alimento seco",
+  "price": 450.0,
+  "priceMax": null,
+  "image": "/img/products/2228.jpg",
+  "description": "Hill’s Science Diet Adult Large Breed Lamb & Rice 33 lb.\nBolsa de 15kg."
+ },
+ {
+  "id": 2144,
+  "name": "Hill’s Science Diet Feline Hairball Control Adult 7+ 3.5 lb",
+  "pets": [
+   "gato"
+  ],
+  "category": "alimento",
+  "subcategory": "Alimento seco",
+  "price": 103.0,
+  "priceMax": null,
+  "image": "/img/products/2144.jpg",
+  "description": "Hill’s Scince Diet Feline Hairball Controll Adult 7+ 3.5 lb.\nBolsa de 1.6kg."
+ },
+ {
+  "id": 2054,
+  "name": "Hill’s PD Canine Metabolic 7.7 lb y 17.6 lb",
+  "pets": [
+   "perro"
+  ],
+  "category": "alimento",
+  "subcategory": "Dieta de prescripción",
+  "price": 193.0,
+  "priceMax": 380.0,
+  "image": "/img/products/2054.jpg",
+  "description": "Hill’s PD Canine Metabolic 7.7 lb y 17.6 lb.\nAlimento para la reducción y mantenimiento de peso en perros adultos; capaz de reducir hasta un 28% de grasa corporal en 60 días.\nBolsa de 3.5kg y 8kg."
+ },
+ {
+  "id": 2014,
+  "name": "Hill’s PD Canine i/d 13 oz",
+  "pets": [
+   "perro"
+  ],
+  "category": "alimento",
+  "subcategory": "Dieta de prescripción",
+  "price": 24.0,
+  "priceMax": null,
+  "image": "/img/products/2014.jpg",
+  "description": "Hill’s PD Canine i/d 13 oz.\nDieta altamente digestible para perros con trastornos gastrointestinales, insuficiencia pancreática exocrina, pancreatitis-no hiperlipidemia, colitis.\nLata de 369gr."
+ },
+ {
+  "id": 1886,
+  "name": "Intersand Simple",
+  "pets": [
+   "gato"
+  ],
+  "category": "higiene",
+  "subcategory": "Arena para gatos",
+  "price": 27.9,
+  "priceMax": 74.9,
+  "image": "/img/products/1886.jpg",
+  "description": "Intersand Simple.\nBolsa de 4kg, 10kg y 18kg."
+ }
+]

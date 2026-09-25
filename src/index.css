@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+/* Modo oscuro por clase (.dark en <html>), inicializado según el sistema en index.html */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Paleta extraída del logo (corazón PetCare):
+ *   Navy  #13396A: mitad derecha del corazón, se usa como tinta y superficies de marca
+ *   Blue  #3578E3: mitad izquierda, solo en tintes de fondo
+ *   Green #009F82: silueta del gato, único color de acento (CTA, enlaces, estados)
+ *
+ * Radios: contenedores 1.25rem (rounded-card), fotos 1.75rem (rounded-media),
+ * inputs rounded-xl, botones y chips en píldora (rounded-full).
+ */
+@theme {
+  --font-sans: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Nunito", ui-rounded, ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-navy: #13396a;
+  --color-brand-navy-deep: #0b2342;
+  --color-brand-blue: #3578e3;
+  --color-brand-green: #009f82;
+
+  --color-background: #f4f7fb;
+  --color-foreground: #0f2440;
+  --color-card: #ffffff;
+  --color-muted: #e9eff6;
+  --color-muted-foreground: #4b5d78;
+  --color-border: #dce4ee;
+
+  --color-primary: #13396a;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #007a64;
+  --color-accent-hover: #00664f;
+  --color-accent-foreground: #ffffff;
+  --color-accent-soft: #e2f3ee;
+  --color-sky: #e8f0fc;
+  --color-danger: #b42318;
+
+  --color-ring: #009f82;
+
+  --radius-card: 1.25rem;
+  --radius-media: 1.75rem;
+
+  --shadow-soft: 0 1px 2px rgb(19 57 106 / 0.06), 0 8px 24px -8px rgb(19 57 106 / 0.14);
+  --shadow-lift: 0 2px 4px rgb(19 57 106 / 0.06), 0 24px 48px -16px rgb(19 57 106 / 0.28);
+
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-slide-in-right: slide-in-right 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-marquee: marquee 40s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+}
+
+.dark {
+  --color-background: #0a1526;
+  --color-foreground: #eaf0f8;
+  --color-card: #10203a;
+  --color-muted: #16294a;
+  --color-muted-foreground: #a3b3cb;
+  --color-border: #213659;
+
+  --color-primary: #c3d6f3;
+  --color-primary-foreground: #0a1526;
+  --color-accent: #34c7a5;
+  --color-accent-hover: #4fd6b6;
+  --color-accent-foreground: #06221c;
+  --color-accent-soft: #0f3431;
+  --color-sky: #142c52;
+  --color-danger: #f97066;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -8px rgb(0 0 0 / 0.5);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 48px -16px rgb(0 0 0 / 0.6);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    font-optical-sizing: auto;
+  }
+  /* Grano sutil para que las superficies no se vean planas */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display text-balance;
+    letter-spacing: -0.02em;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+@layer utilities {
+  /* Aparición al entrar en pantalla, sin JS; se desactiva con movimiento reducido */
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      .reveal {
+        animation: fade-up linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 40%;
+      }
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
