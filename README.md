@@ -21,7 +21,7 @@ Cada push a `main` compila y publica la web con `.github/workflows/deploy.yml`.
 2. Haz push a `main`. El avance se ve en la pestaña *Actions*.
 3. La web queda en `https://jeanclix.github.io/PetCare/`.
 
-Para activar HubSpot en la versión publicada, crea las variables `VITE_HUBSPOT_*` de `.env.example` en *Settings > Secrets and variables > Actions > Variables* y vuelve a ejecutar el workflow. Son IDs públicos, por eso van como *Variables* y no como *Secrets*.
+La configuración de HubSpot para la versión publicada está en `.env.production` (IDs públicos, versionados en el repo).
 
 ## Páginas
 
@@ -37,7 +37,7 @@ El carrito se guarda en el navegador y **el pedido se finaliza por WhatsApp** co
 
 ### HubSpot (CRM)
 
-La integración ya está programada en `src/lib/hubspot.ts` y se activa con variables de entorno (`.env.example`):
+La integración ya está programada en `src/lib/hubspot.ts` y se configura en `.env.production`. El código de seguimiento ya está activo (Hub ID `52059776`):
 
 - Seguimiento de visitas y fuentes, incluida la navegación interna de la web.
 - Formulario de citas enviado a HubSpot con datos del dueño y de la mascota, consentimiento (Ley N.° 29733) y agenda de Meetings al terminar.

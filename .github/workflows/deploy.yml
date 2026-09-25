@@ -28,16 +28,8 @@ jobs:
 
       - run: npm ci
 
-      # IDs públicos de HubSpot: Settings > Secrets and variables > Actions > Variables.
-      # Si no están definidos, la web funciona con WhatsApp como respaldo.
+      # La configuración pública de HubSpot se lee de .env.production
       - run: npm run build
-        env:
-          VITE_HUBSPOT_PORTAL_ID: ${{ vars.VITE_HUBSPOT_PORTAL_ID }}
-          VITE_HUBSPOT_REGION: ${{ vars.VITE_HUBSPOT_REGION }}
-          VITE_HUBSPOT_APPOINTMENT_FORM_ID: ${{ vars.VITE_HUBSPOT_APPOINTMENT_FORM_ID }}
-          VITE_HUBSPOT_ORDER_FORM_ID: ${{ vars.VITE_HUBSPOT_ORDER_FORM_ID }}
-          VITE_HUBSPOT_MEETINGS_URL: ${{ vars.VITE_HUBSPOT_MEETINGS_URL }}
-          VITE_HUBSPOT_MARKETING_SUBSCRIPTION_ID: ${{ vars.VITE_HUBSPOT_MARKETING_SUBSCRIPTION_ID }}
 
       - uses: actions/configure-pages@v6
 

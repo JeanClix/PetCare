@@ -1,6 +1,8 @@
 # Conectar la web con HubSpot
 
-La web ya tiene la integración programada (`src/lib/hubspot.ts`). Se activa sola cuando completas el archivo `.env`; mientras tanto, todo sigue funcionando con WhatsApp.
+La web ya tiene la integración programada (`src/lib/hubspot.ts`). Cada parte se activa sola cuando su valor está en `.env.production`; mientras tanto, esa parte sigue funcionando con WhatsApp.
+
+**Estado actual:** el código de seguimiento ya está activo (Hub ID `52059776`, región `na1`). Faltan los formularios, la agenda y, opcionalmente, la suscripción de marketing.
 
 Todos los datos que se piden aquí son **públicos** (terminan en el navegador del visitante). Nunca pongas en `.env` ni compartas en el chat un token de "app privada" de HubSpot.
 
@@ -8,10 +10,10 @@ Todos los datos que se piden aquí son **públicos** (terminan en el navegador d
 
 ### 1. Hub ID y región
 
-- **Hub ID:** número de tu cuenta. Aparece al hacer clic en el nombre de tu cuenta (arriba a la derecha).
+- **Hub ID:** número de tu cuenta. Aparece en el código de seguimiento (`js.hs-scripts.com/<Hub ID>.js`). Ya configurado: `52059776`.
 - **Región:** si entras por `app.hubspot.com` es `na1`; si entras por `app-eu1.hubspot.com` es `eu1`.
 
-→ `VITE_HUBSPOT_PORTAL_ID` y `VITE_HUBSPOT_REGION`
+→ `VITE_HUBSPOT_PORTAL_ID` y `VITE_HUBSPOT_REGION` (ya configurados)
 
 ### 2. Propiedades de contacto personalizadas
 
@@ -66,8 +68,8 @@ No necesitan cambios en la web:
 
 ## Activar
 
-1. Copia `.env.example` como `.env` y completa los valores.
-2. Reinicia `npm run dev` (Vite solo lee `.env` al arrancar).
+1. Completa los valores pendientes en `.env.production` y haz push: el deploy los toma solo.
+2. Para probar en tu computadora antes de subir, copia los mismos valores en un archivo `.env.local` y reinicia `npm run dev` (Vite solo lee los `.env` al arrancar). En `npm run dev` no se usa `.env.production`, así tus pruebas locales no ensucian las estadísticas.
 3. Envía una cita de prueba y comprueba que aparece el contacto en HubSpot con sus propiedades.
 
 ## Lo que requiere algo más que la web

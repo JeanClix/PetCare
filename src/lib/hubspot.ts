@@ -5,17 +5,18 @@
  * Nunca pongas aquí un token de "private app": todo lo que empieza con VITE_ llega al navegador.
  */
 
-const env = import.meta.env;
+// Un valor vacío cuenta como "no configurado"
+const read = (key: string) => (import.meta.env[key] as string | undefined)?.trim() || undefined;
 
 export const hubspot = {
-  portalId: env.VITE_HUBSPOT_PORTAL_ID as string | undefined,
+  portalId: read("VITE_HUBSPOT_PORTAL_ID"),
   /** "na1" (app.hubspot.com) o "eu1" (app-eu1.hubspot.com) */
-  region: (env.VITE_HUBSPOT_REGION as string | undefined) ?? "na1",
-  appointmentFormId: env.VITE_HUBSPOT_APPOINTMENT_FORM_ID as string | undefined,
-  orderFormId: env.VITE_HUBSPOT_ORDER_FORM_ID as string | undefined,
-  meetingsUrl: env.VITE_HUBSPOT_MEETINGS_URL as string | undefined,
+  region: read("VITE_HUBSPOT_REGION") ?? "na1",
+  appointmentFormId: read("VITE_HUBSPOT_APPOINTMENT_FORM_ID"),
+  orderFormId: read("VITE_HUBSPOT_ORDER_FORM_ID"),
+  meetingsUrl: read("VITE_HUBSPOT_MEETINGS_URL"),
   /** ID del tipo de suscripción para correos de marketing (opcional) */
-  marketingSubscriptionId: env.VITE_HUBSPOT_MARKETING_SUBSCRIPTION_ID as string | undefined,
+  marketingSubscriptionId: read("VITE_HUBSPOT_MARKETING_SUBSCRIPTION_ID"),
 };
 
 export const consentText =
