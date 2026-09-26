@@ -155,3 +155,10 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Con el asistente abierto en pantallas chicas, se oculta el chat de HubSpot para que no lo tape */
+@media (max-width: 639px) {
+  body.assistant-open #hubspot-messages-iframe-container {
+    display: none !important;
+  }
+}

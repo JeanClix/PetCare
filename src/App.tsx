@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { Assistant } from "@/components/Assistant";
 import { CartDrawer } from "@/components/CartDrawer";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -48,6 +49,7 @@ export function App() {
       </main>
       <Footer />
       <CartDrawer />
+      <Assistant />
     </div>
   );
 }

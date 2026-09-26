@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "asistente:build": "esbuild functions/asistente/index.ts --bundle --platform=node --target=node24 --format=esm --outfile=.neon-build/asistente/index.mjs",
+    "asistente:deploy": "npm run asistente:build && neon functions deploy asistente --project-id noisy-sound-40643156 --branch main --src .neon-build/asistente --no-bundle --env GROQ_API_KEY=$GROQ_API_KEY"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -23,6 +25,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.1"
