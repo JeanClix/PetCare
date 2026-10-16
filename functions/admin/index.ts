@@ -258,12 +258,28 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_marketing_campaigns (
+      id UUID PRIMARY KEY,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      recipient TEXT NOT NULL,
+      status TEXT NOT NULL,
+      provider_id TEXT,
+      error TEXT NOT NULL DEFAULT '',
+      is_test BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      sent_at TIMESTAMPTZ
+    )
+  `;
+  await sql`ALTER TABLE petcare_marketing_campaigns ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT false`;
   await sql`ALTER TABLE petcare_messages ADD COLUMN IF NOT EXISTS external_id TEXT`;
   await sql`ALTER TABLE petcare_leads ADD COLUMN IF NOT EXISTS external_id TEXT`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS petcare_messages_external_id_idx ON petcare_messages (external_id) WHERE external_id IS NOT NULL`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS petcare_leads_external_id_idx ON petcare_leads (external_id) WHERE external_id IS NOT NULL`;
   await sql`CREATE INDEX IF NOT EXISTS petcare_messages_contact_created_idx ON petcare_messages (contact_id, created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS petcare_leads_contact_created_idx ON petcare_leads (contact_id, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS petcare_marketing_campaigns_sent_idx ON petcare_marketing_campaigns (sent_at DESC) WHERE status = 'sent'`;
 }
 
 async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput, metadata: CaptureMetadata = {}) {
@@ -583,7 +599,7 @@ export default {
     try {
       await ensureSchema(sql);
       if (action === "read") {
-        const [contacts, messages, leads] = await Promise.all([
+        const [contacts, messages, leads, campaignStats] = await Promise.all([
           sql`SELECT id, firstname, lastname, email, phone, source, lifecycle,
             lifecycle_updated_at AS "lifecycleUpdatedAt", lifecycle_reason AS "lifecycleReason",
             engagement_count AS "engagementCount", order_request_count AS "orderRequestCount",
@@ -598,11 +614,73 @@ export default {
             l.items, l.details, l.created_at AS "createdAt"
             FROM petcare_leads l JOIN petcare_contacts c ON c.id = l.contact_id
             ORDER BY l.created_at DESC`,
+          sql`SELECT
+            count(*) FILTER (WHERE status = 'sent' AND NOT is_test)::int AS campaigns,
+            count(*) FILTER (WHERE status = 'sent' AND NOT is_test)::int AS emails,
+            count(*) FILTER (WHERE status = 'sent' AND is_test)::int AS test_emails
+            FROM petcare_marketing_campaigns`,
         ]);
-        return response({ contacts, messages, leads }, 200, origin);
+        return response({
+          contacts,
+          messages,
+          leads,
+          marketing: {
+            available: Boolean(process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_MARKETING_FROM?.trim()),
+            campaignsSent: Number(campaignStats[0]?.campaigns ?? 0),
+            emailsSent: Number(campaignStats[0]?.emails ?? 0),
+            testEmailsSent: Number(campaignStats[0]?.test_emails ?? 0),
+          },
+        }, 200, origin);
       }
 
       const body = await parseJsonBody(request);
+      if (action === "marketing-send") {
+        const apiKey = process.env.RESEND_API_KEY?.trim();
+        const from = process.env.EMAIL_MARKETING_FROM?.trim();
+        if (!apiKey || !from) {
+          return response({ error: "El proveedor de correo no está configurado." }, 503, origin);
+        }
+        const subject = text(body?.subject, 160);
+        const message = text(body?.message, 5000);
+        if (!subject || /[\r\n]/.test(subject) || !message) {
+          return response({ error: "Ingresa un asunto y un mensaje de hasta 5000 caracteres." }, 400, origin);
+        }
+
+        const id = crypto.randomUUID();
+        const recipient = "aylin_santacruz@hotmail.com";
+        const testSubject = `[PRUEBA] ${subject}`;
+        await sql`
+          INSERT INTO petcare_marketing_campaigns (id, subject, body, recipient, status, is_test)
+          VALUES (${id}::uuid, ${testSubject}, ${message}, ${recipient}, 'sending', true)
+        `;
+        try {
+          const result = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ from, to: [recipient], subject: testSubject, text: message }),
+          });
+          const detail = await result.json().catch(() => null) as { id?: unknown; message?: unknown } | null;
+          if (!result.ok) {
+            const error = text(detail?.message, 500) || `Resend respondió ${result.status}.`;
+            await sql`UPDATE petcare_marketing_campaigns SET status = 'failed', error = ${error} WHERE id = ${id}::uuid`;
+            console.error("Resend rechazó la campaña", { status: result.status, error });
+            return response({ error: "El proveedor no pudo enviar el correo. Revisa la configuración de Resend." }, 502, origin);
+          }
+          await sql`
+            UPDATE petcare_marketing_campaigns
+            SET status = 'sent', provider_id = ${typeof detail?.id === "string" ? detail.id : null}, sent_at = now()
+            WHERE id = ${id}::uuid
+          `;
+          return response({ ok: true }, 200, origin);
+        } catch (error) {
+          console.error("No se pudo enviar la campaña", error);
+          await sql`UPDATE petcare_marketing_campaigns SET status = 'failed', error = 'Error de conexión con Resend.' WHERE id = ${id}::uuid`;
+          return response({ error: "No se pudo conectar con el proveedor de correo." }, 502, origin);
+        }
+      }
       if (action === "lifecycle") {
         const id = text(body?.id, 64);
         const lifecycle = text(body?.lifecycle, 32);

@@ -34,7 +34,7 @@ Una solicitud, un pedido por WhatsApp o un correo electrónico no demuestran por
 
 El panel muestra conteos reales para contactos con consentimiento, leads, clientes nuevos, clientes recurrentes y mensajes. Los segmentos de marketing incluyen únicamente contactos con `marketing_consent` activo. Desde cada segmento se puede consultar o exportar la lista consentida.
 
-Campañas enviadas, emails enviados, entregas, aperturas, clics, rebotes y bajas aparecen como no disponibles: todavía no existe proveedor de email conectado ni eventos de envío que sustenten esas métricas. El panel no envía mensajes y no se deben subir contactos sin consentimiento a campañas.
+El panel permite previsualizar el correo en escritorio o móvil y enviar una prueba solo a `aylin_santacruz@hotmail.com`, mediante Resend configurado en el backend. El asunto se marca `[PRUEBA]` y el envío queda registrado aparte, sin contarse como campaña real ni enviarse a contactos del CRM. Entregas, aperturas, clics, rebotes y bajas no están disponibles porque aún no se reciben esos eventos de Resend.
 
 Los leads e interesados pueden identificarse como personas sin una compra confirmada, según el lifecycle que mantiene el equipo. Los clientes nuevos, recurrentes y fidelizados son etapas manuales y requieren verificación. Los clientes inactivos no están definidos porque PetCare aún no ha establecido cuánto tiempo sin actividad cuenta como inactividad.
 
@@ -45,10 +45,10 @@ La tienda conserva el carrito en el navegador y termina los pedidos por WhatsApp
 ## Pendientes para activar automatizaciones
 
 - Crear y configurar el enlace HubSpot Meetings; no se necesita una clave privada para mostrar ese enlace público.
-- Elegir y configurar un proveedor de email con credenciales solo en el backend.
-- Implementar gestión de bajas y comprobarla antes de todo envío comercial.
+- Verificar el remitente en Resend y configurar `RESEND_API_KEY` y `EMAIL_MARKETING_FROM` como variables secretas de la función Neon.
+- Para enviar campañas a contactos, implementar gestión de bajas y comprobar el consentimiento antes de cada envío.
 - Definir reglas de inactividad y fidelización basadas en criterios reales del negocio.
 - Conectar una fuente de compras confirmadas y, si se requiere, eventos de reserva de Meetings.
-- Implementar campañas editables, pruebas, destinatarios, exclusiones y métricas solo después de contar con el proveedor y la gestión de consentimiento.
+- Ampliar de los correos de prueba a campañas para contactos solo después de implementar bajas, exclusiones y consentimiento por destinatario.
 
 Documentación relacionada: [SEO_PETCARE.md](SEO_PETCARE.md), [acceso administrativo y CRM](docs/admin.md) y [conexión con HubSpot](docs/hubspot.md).
