@@ -26,11 +26,15 @@ neon functions deploy admin --project-id $NeonProjectId --branch main --src .neo
 
 No pongas estas variables en `.env`, `.env.production`, el frontend ni en Git. El despliegue pasa las credenciales a Neon como configuración de la función. Al terminar, toma la URL pública que Neon muestra para la función `admin` y configúrala como `VITE_ADMIN_API_URL` en `.env.production` para el deploy de GitHub Pages. Para desarrollo local, define la misma variable en `.env.local`. La URL no es un secreto; `ADMIN_*` y `DATABASE_URL` sí lo son.
 
-En GitHub, guarda la URL pública como variable de repositorio `VITE_ADMIN_API_URL` (Settings → Secrets and variables → Actions → Variables) para que el workflow de Pages la inyecte en el build. Vuelve a publicar el sitio. La función crea las tablas e índices CRM de forma idempotente al atender la primera solicitud; el rol de la conexión necesita permisos para crear tablas e índices. Las rutas `/login`, `/verify`, `/capture` y `/crm/*` pertenecen a la función.
+En GitHub, guarda la URL pública como variable de repositorio `VITE_ADMIN_API_URL` (Settings → Secrets and variables → Actions → Variables) para que el workflow de Pages la inyecte en el build. Vuelve a publicar el sitio. La función crea las tablas e índices CRM de forma idempotente al atender la primera solicitud; el rol de la conexión necesita permisos para crear tablas e índices. Las rutas `/login`, `/register`, `/verify`, `/capture`, `/account/order` y `/crm/*` pertenecen a la función.
 
 ## Alcance y datos CRM
 
-El inicio de sesión está validado en servidor y la sesión solo se mantiene en memoria del navegador; al recargar se solicita iniciar sesión otra vez. La limitación por intentos es local a cada instancia de la función, por lo que no reemplaza un proveedor de identidad con protección distribuida.
+El inicio de sesión se comparte entre clientes y administrador. Los clientes se registran con nombre, correo y contraseña; la contraseña se guarda en Neon con hash scrypt y sal aleatoria. Las sesiones firmadas distinguen `customer` y `admin`, se conservan en `sessionStorage` y expiran después de dos horas. El backend exige rol de administrador para las rutas CRM y rol de cliente para registrar pedidos. El correo administrativo está reservado y solo autentica con la contraseña configurada en Neon. La limitación por intentos es local a cada instancia de la función, por lo que no reemplaza un proveedor de identidad con protección distribuida.
+
+El registro no envía todavía una verificación por correo ni ofrece recuperación de contraseña; configura esos flujos antes de abrir el registro a un uso que requiera verificación de identidad o recuperación autoservicio.
+
+El registro crea o vincula un contacto CRM con origen `registration`, lifecycle `lead` y consentimiento de marketing desactivado. El carrito puede llenarse sin iniciar sesión; al continuar al checkout, el visitante inicia sesión o crea una cuenta. El carrito se conserva y, tras autenticarse, vuelve al formulario de pedido. El pedido toma nombre y correo de la sesión verificada, solicita teléfono y autorización para gestionar la solicitud y se registra asociado al contacto. Los pedidos se coordinan por WhatsApp y no representan pagos confirmados.
 
 Los datos nuevos se escriben en Neon. Al iniciar sesión, si el mismo navegador todavía conserva leads del prototipo, el panel ofrece copiarlos a Neon; la operación es reintentable sin crear contactos/leads duplicados y no borra el respaldo local.
 

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
-import { isAdminAuthConfigured, isDevelopmentAdminAuth, loginAdmin, type AdminSession } from "@/lib/adminAuth";
+import { useAuth } from "@/context/AuthContext";
+import { isAdminAuthConfigured } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
 import {
   clearCrmData,
@@ -51,13 +53,7 @@ const messageStatusLabels: Record<MessageStatus, string> = {
 };
 
 export function Admin() {
-  const [session, setSession] = useState<AdminSession | null>(null);
-
-  useEffect(() => {
-    if (!session) return;
-    const timeout = window.setTimeout(() => setSession(null), session.expiresIn * 1000);
-    return () => window.clearTimeout(timeout);
-  }, [session]);
+  const { user, ready, logout } = useAuth();
 
   if (!isAdminAuthConfigured()) {
     return (
@@ -75,77 +71,12 @@ export function Admin() {
     );
   }
 
-  return session ? (
-    <AdminDashboard token={session.token} onLogout={() => setSession(null)} />
-  ) : (
-    <AdminLogin onLogin={setSession} />
-  );
-}
-
-function AdminLogin({ onLogin }: { onLogin: (session: AdminSession) => void }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError("");
-    try {
-      onLogin(await loginAdmin(email, password));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No se pudo iniciar sesión.");
-    } finally {
-      setSubmitting(false);
-    }
+  if (!ready) {
+    return <Container className="py-20 text-center text-muted-foreground">Verificando tu sesión...</Container>;
   }
 
-  return (
-    <>
-      <PageHeader title="Acceso de administrador" description="Inicia sesión para gestionar el CRM de PetCare." />
-      <Container className="py-14 sm:py-20">
-        <form onSubmit={handleSubmit} className="mx-auto max-w-md space-y-5 rounded-media border border-border bg-card p-6 shadow-soft sm:p-8">
-          <div>
-            <label htmlFor="admin-email" className="mb-2 block text-sm font-bold">{isDevelopmentAdminAuth ? "Usuario" : "Correo del administrador"}</label>
-            <input
-              id="admin-email"
-              type={isDevelopmentAdminAuth ? "text" : "email"}
-              autoComplete="username"
-              required
-              placeholder={isDevelopmentAdminAuth ? "admin" : undefined}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 focus:border-accent focus:outline-none"
-            />
-          </div>
-          <div>
-            <label htmlFor="admin-password" className="mb-2 block text-sm font-bold">Contraseña</label>
-            <input
-              id="admin-password"
-              type="password"
-              autoComplete="current-password"
-              required
-              placeholder={isDevelopmentAdminAuth ? "admin" : undefined}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 focus:border-accent focus:outline-none"
-            />
-          </div>
-          {error && <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">{error}</p>}
-          <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-            {submitting ? "Validando..." : "Iniciar sesión"}
-          </Button>
-          {isDevelopmentAdminAuth && (
-            <p className="rounded-xl bg-yellow-50 px-4 py-3 text-center text-xs font-semibold text-yellow-800">
-              Acceso de prueba local: usuario <code>admin</code> y contraseña <code>admin</code>. Solo funciona con el servidor de desarrollo.
-            </p>
-          )}
-          <p className="text-center text-xs text-muted-foreground">La sesión se cierra automáticamente después de 2 horas.</p>
-        </form>
-      </Container>
-    </>
-  );
+  if (!user || user.role !== "admin") return <Navigate to="/cuenta?next=%2Fadmin" replace />;
+  return <AdminDashboard token={user.token} onLogout={logout} />;
 }
 
 function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: string }) {

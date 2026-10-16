@@ -4,6 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
+import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { business } from "@/data/site";
 import { cn } from "@/lib/utils";
@@ -14,13 +15,16 @@ const nav = [
   { to: "/servicios", label: "Servicios" },
   { to: "/nosotros", label: "Nosotros" },
   { to: "/contacto", label: "Contacto" },
-  { to: "/admin", label: "Admin" },
 ];
 
 export function Header() {
   const { count, open } = useCart();
+  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
+  const accountLink = user?.role === "admin" ? "/admin" : "/cuenta";
+  const accountLabel = user?.role === "admin" ? "Panel admin" : user ? "Mi cuenta" : "Iniciar sesión";
+  const navItems = [...nav, { to: accountLink, label: accountLabel }];
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -47,7 +51,7 @@ export function Header() {
           <Logo />
 
           <nav className="hidden items-center gap-7 lg:flex" aria-label="Principal">
-            {nav.map((item) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -93,7 +97,7 @@ export function Header() {
         {menuOpen && (
           <nav className="animate-fade-up border-t border-border lg:hidden" aria-label="Móvil">
             <Container className="flex flex-col py-3">
-              {nav.map((item) => (
+              {navItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
