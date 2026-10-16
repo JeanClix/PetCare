@@ -14,6 +14,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button, ButtonAnchor, ButtonLink } from "@/components/ui/Button";
 import { ConsentFields, OwnerFields, validateContact, type ContactErrors } from "@/components/ui/Form";
 import { useCart } from "@/context/CartContext";
+import { captureCrmLead } from "@/lib/crm";
 import { hubspot, submitHubSpotForm } from "@/lib/hubspot";
 import { formatPrice, whatsappLink } from "@/lib/utils";
 
@@ -66,28 +67,55 @@ export function CartDrawer() {
     }
 
     const get = (k: string) => String(data.get(k) ?? "").trim();
+    const owner = `${get("firstname")} ${get("lastname")}`.trim();
+    const lead = {
+      type: "order" as const,
+      channel: "form" as const,
+      firstname: get("firstname"),
+      lastname: get("lastname"),
+      email: get("email"),
+      phone: get("phone"),
+      service: "Pedido de tienda",
+      total,
+      items: orderLines,
+      details: orderMessage,
+      consent: data.get("consent") === "on",
+      marketingConsent: data.get("marketing") === "on",
+    };
+
     setStep("sending");
     setSubmitError(null);
-    const result = await submitHubSpotForm(
-      hubspot.orderFormId,
-      {
-        firstname: get("firstname"),
-        lastname: get("lastname"),
-        email: get("email"),
-        phone: get("phone").replace(/\D/g, ""),
-        detalle_pedido: orderLines.join("\n"),
-        monto_pedido: total.toFixed(2),
-      },
-      { marketing: data.get("marketing") === "on" },
-    );
+    try {
+      await captureCrmLead(lead);
+    } catch (cause) {
+      setSubmitError(cause instanceof Error ? cause.message : "No pudimos guardar tu pedido.");
+      setStep("checkout");
+      return;
+    }
+
+    const result = crmEnabled
+      ? await submitHubSpotForm(
+          hubspot.orderFormId,
+          {
+            firstname: get("firstname"),
+            lastname: get("lastname"),
+            email: get("email"),
+            phone: get("phone").replace(/\D/g, ""),
+            detalle_pedido: orderLines.join("\n"),
+            monto_pedido: total.toFixed(2),
+          },
+          { marketing: data.get("marketing") === "on" },
+        )
+      : { status: "skipped" as const };
 
     if (result.status === "error") {
       setSubmitError(result.message);
       setStep("checkout");
       return;
     }
+
     // Safari puede bloquear esta ventana por abrirse tras la espera; el panel final repite el enlace
-    const link = whatsappLink(`${orderMessage}\nA nombre de: ${get("firstname")} ${get("lastname")}`);
+    const link = whatsappLink(`${orderMessage}\nA nombre de: ${owner}`);
     window.open(link, "_blank", "noopener");
     setOrderWhatsapp(link);
     clear();
@@ -179,15 +207,9 @@ export function CartDrawer() {
                 <span className="text-muted-foreground">Total</span>
                 <span className="font-display text-2xl font-black tabular-nums">{formatPrice(total)}</span>
               </div>
-              {crmEnabled ? (
-                <Button size="lg" className="w-full" onClick={() => setStep("checkout")}>
-                  Continuar
-                </Button>
-              ) : (
-                <ButtonAnchor href={whatsappLink(orderMessage)} variant="whatsapp" size="lg" className="w-full">
-                  <WhatsappLogo weight="fill" /> Finalizar pedido
-                </ButtonAnchor>
-              )}
+              <Button size="lg" className="w-full" onClick={() => setStep("checkout")}>
+                Continuar
+              </Button>
             </div>
           </>
         ) : (

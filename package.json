@@ -8,9 +8,11 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "asistente:build": "esbuild functions/asistente/index.ts --bundle --platform=node --target=node24 --format=esm --outfile=.neon-build/asistente/index.mjs",
-    "asistente:deploy": "npm run asistente:build && neon functions deploy asistente --project-id noisy-sound-40643156 --branch main --src .neon-build/asistente --no-bundle --env GROQ_API_KEY=$GROQ_API_KEY"
+    "asistente:deploy": "npm run asistente:build && neon functions deploy asistente --project-id noisy-sound-40643156 --branch main --src .neon-build/asistente --no-bundle --env GROQ_API_KEY=$GROQ_API_KEY",
+    "admin:build": "esbuild functions/admin/index.ts --bundle --platform=node --target=node24 --format=esm --outfile=.neon-build/admin/index.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "@phosphor-icons/react": "^2.1.10",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

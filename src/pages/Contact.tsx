@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/Form";
 import type { Pet } from "@/data/products";
 import { business, photos, services } from "@/data/site";
+import { captureCrmLead } from "@/lib/crm";
 import { hubspot, submitHubSpotForm, toHubSpotPhone } from "@/lib/hubspot";
 import { whatsappLink } from "@/lib/utils";
 
@@ -63,24 +64,50 @@ export function Contact() {
 
     const get = (k: string) => String(data.get(k) ?? "").trim();
     const service = services.find((s) => s.id === get("servicio_interes"))!;
+    const owner = `${get("firstname")} ${get("lastname")}`.trim();
+    const pet = `${get("nombre_mascota") || "sin nombre"} (${petOptions.find(([v]) => v === get("tipo_mascota"))?.[1] ?? "Mascota"})`;
     const whatsappMessage = [
       "Hola PetCare, quisiera agendar una cita.",
-      `Nombre: ${get("firstname")} ${get("lastname")}`,
-      `Mascota: ${get("nombre_mascota") || "sin nombre"} (${petOptions.find(([v]) => v === get("tipo_mascota"))![1]})`,
+      `Nombre: ${owner}`,
+      `Mascota: ${pet}`,
       `Servicio: ${service.name}`,
       get("message") ? `Mensaje: ${get("message")}` : "",
     ]
       .filter(Boolean)
       .join("\n");
 
-    // Sin HubSpot configurado, la solicitud se envía por WhatsApp como antes
+    const lead = {
+      type: "appointment" as const,
+      channel: crmEnabled ? "form" as const : "whatsapp" as const,
+      firstname: get("firstname"),
+      lastname: get("lastname"),
+      email: get("email"),
+      phone: get("phone"),
+      service: service.name,
+      pet,
+      details: get("message") || undefined,
+      consent: data.get("consent") === "on",
+      marketingConsent: data.get("marketing") === "on",
+    };
+
+    setStatus({ kind: "sending" });
+    try {
+      await captureCrmLead(lead);
+    } catch (cause) {
+      setStatus({
+        kind: "error",
+        message: cause instanceof Error ? cause.message : "No pudimos guardar tu solicitud.",
+        whatsappMessage,
+      });
+      return;
+    }
+
     if (!crmEnabled) {
       window.open(whatsappLink(whatsappMessage), "_blank", "noopener");
       setStatus({ kind: "whatsapp" });
       return;
     }
 
-    setStatus({ kind: "sending" });
     const result = await submitHubSpotForm(
       hubspot.appointmentFormId,
       {
@@ -100,6 +127,7 @@ export function Contact() {
       setStatus({ kind: "error", message: result.message, whatsappMessage });
       return;
     }
+
     setStatus({ kind: "sent", owner: { firstname: get("firstname"), lastname: get("lastname"), email: get("email") } });
     form.reset();
   }

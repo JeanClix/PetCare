@@ -48,11 +48,10 @@ function Hero() {
             Clínica veterinaria en Surco desde {business.foundedYear}
           </p>
           <h1 className="text-[2.6rem] leading-[1.02] font-black tracking-[-0.035em] text-primary sm:text-6xl lg:text-[3.5rem] xl:text-[3.75rem]">
-            Tu engreído, en las <em className="pr-1 text-accent">mejores manos</em>
+            Clínica veterinaria en Surco para <em className="pr-1 text-accent">perros, gatos y exóticos</em>
           </h1>
           <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-muted-foreground sm:text-xl">
-            Consultas, grooming, cirugías y farmacia para perros, gatos y exóticos, con médicos colegiados y atención a
-            domicilio.
+            Consultas veterinarias, grooming para perros y gatos, vacunas, cirugías, microchip y farmacia en Surco, Lima, con médicos colegiados y atención a domicilio.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4">
             <ButtonLink to="/contacto" size="lg">

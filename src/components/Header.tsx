@@ -14,6 +14,7 @@ const nav = [
   { to: "/servicios", label: "Servicios" },
   { to: "/nosotros", label: "Nosotros" },
   { to: "/contacto", label: "Contacto" },
+  { to: "/admin", label: "Admin" },
 ];
 
 export function Header() {

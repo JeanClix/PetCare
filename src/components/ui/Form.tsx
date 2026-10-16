@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { business } from "@/data/site";
-import { hubspot, marketingText } from "@/lib/hubspot";
+import { marketingText } from "@/lib/hubspot";
 import { cn } from "@/lib/utils";
 
 export const inputClass =
@@ -112,12 +112,10 @@ export function ConsentFields({ error }: { error?: string }) {
           </p>
         )}
       </div>
-      {hubspot.marketingSubscriptionId && (
-        <label className="flex gap-3">
-          <input type="checkbox" name="marketing" className="mt-0.5 size-5 shrink-0 accent-[var(--color-accent)]" />
-          <span className="text-muted-foreground">{marketingText}</span>
-        </label>
-      )}
+      <label className="flex gap-3">
+        <input type="checkbox" name="marketing" className="mt-0.5 size-5 shrink-0 accent-[var(--color-accent)]" />
+        <span className="text-muted-foreground">{marketingText}</span>
+      </label>
     </div>
   );
 }
