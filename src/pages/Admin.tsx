@@ -396,7 +396,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                   <tr>
                     <th className="px-4 py-3 font-semibold">Contacto</th>
                     <th className="px-4 py-3 font-semibold">Tipo</th>
-                    <th className="px-4 py-3 font-semibold">Servicio</th>
+                    <th className="px-4 py-3 font-semibold">Servicio / productos</th>
                     <th className="px-4 py-3 font-semibold">Canal</th>
                     <th className="px-4 py-3 font-semibold">Estado</th>
                     <th className="px-4 py-3 font-semibold">Fecha</th>
@@ -416,7 +416,19 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                         </span>
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">
-                        {lead.service || lead.pet || "—"}
+                        {lead.type === "order" ? (
+                          lead.items?.length ? (
+                            <ul className="space-y-1">
+                              {lead.items.map((item, index) => <li key={`${lead.id}-${index}`}>{item}</li>)}
+                            </ul>
+                          ) : lead.details?.trim() ? (
+                            <p className="whitespace-pre-wrap">{lead.details}</p>
+                          ) : (
+                            <span className="italic">Productos no registrados en este pedido</span>
+                          )
+                        ) : (
+                          lead.service || lead.pet || "Sin servicio especificado"
+                        )}
                         {lead.total !== undefined && <span className="mt-1 block font-semibold text-foreground">S/ {lead.total.toFixed(2)}</span>}
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">
@@ -679,7 +691,16 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                 <ul className="mt-3 space-y-2">
                   {selectedContactLeads.filter((lead) => lead.type === "order").map((lead) => (
                     <li key={lead.id} className="rounded-xl border border-border p-4 text-sm">
-                      <p className="font-bold">{lead.service ?? "Pedido"} · {lead.status}</p>
+                      <p className="font-bold">Pedido · {statusLabels[lead.status]}</p>
+                      {lead.items?.length ? (
+                        <ul className="mt-2 list-inside list-disc space-y-1">
+                          {lead.items.map((item, index) => <li key={`${lead.id}-${index}`}>{item}</li>)}
+                        </ul>
+                      ) : lead.details?.trim() ? (
+                        <p className="mt-2 whitespace-pre-wrap">{lead.details}</p>
+                      ) : (
+                        <p className="mt-2 text-muted-foreground">Este pedido no tiene productos detallados.</p>
+                      )}
                       {lead.total !== undefined && <p className="mt-1">S/ {Number(lead.total).toFixed(2)}</p>}
                       <time className="mt-1 block text-xs text-muted-foreground">{formatDate(lead.createdAt)}</time>
                     </li>
