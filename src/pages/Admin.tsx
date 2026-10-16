@@ -476,7 +476,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">
                         {lead.service || lead.pet || "—"}
-                        {lead.total ? <span className="mt-1 block font-semibold text-foreground">S/ {lead.total.toFixed(2)}</span> : null}
+                        {lead.total !== undefined && <span className="mt-1 block font-semibold text-foreground">S/ {lead.total.toFixed(2)}</span>}
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">
                         {lead.channel === "whatsapp" ? "WhatsApp" : "Formulario"}
