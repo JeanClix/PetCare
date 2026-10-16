@@ -62,6 +62,10 @@ export type CrmData = {
   leads: CrmLead[];
 };
 
+type CrmApiData = Omit<CrmData, "leads"> & {
+  leads: Array<Omit<CrmLead, "total"> & { total?: number | string | null }>;
+};
+
 export type CaptureLeadInput = {
   type: CrmLeadType;
   channel: CrmLeadChannel;
@@ -79,11 +83,18 @@ export type CaptureLeadInput = {
 };
 
 export async function getCrmData(token: string): Promise<CrmData> {
-  const result = await adminRequest<CrmData>("/crm/read", {}, token);
+  const result = await adminRequest<CrmApiData>("/crm/read", {}, token);
   return {
     contacts: result.contacts.map((contact) => ({ ...contact, createdAt: new Date(contact.createdAt).toISOString(), lastSeenAt: new Date(contact.lastSeenAt).toISOString() })),
     messages: result.messages.map((message) => ({ ...message, createdAt: new Date(message.createdAt).toISOString() })),
-    leads: result.leads.map((lead) => ({ ...lead, createdAt: new Date(lead.createdAt).toISOString() })),
+    leads: result.leads.map((lead) => {
+      let total: number | undefined;
+      if (lead.total !== undefined && lead.total !== null) {
+        total = typeof lead.total === "number" ? lead.total : Number(lead.total);
+        if (!Number.isFinite(total)) throw new Error("El CRM devolvió un monto de pedido inválido.");
+      }
+      return { ...lead, total, createdAt: new Date(lead.createdAt).toISOString() };
+    }),
   };
 }
 
