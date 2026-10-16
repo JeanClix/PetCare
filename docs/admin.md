@@ -28,14 +28,19 @@ No pongas estas variables en `.env`, `.env.production`, el frontend ni en Git. E
 
 En GitHub, guarda la URL pública como variable de repositorio `VITE_ADMIN_API_URL` (Settings → Secrets and variables → Actions → Variables) para que el workflow de Pages la inyecte en el build. Vuelve a publicar el sitio. La función crea las tablas e índices CRM de forma idempotente al atender la primera solicitud; el rol de la conexión necesita permisos para crear tablas e índices. Las rutas `/login`, `/register`, `/verify`, `/capture`, `/account/order` y `/crm/*` pertenecen a la función.
 
-### Envío de correo de prueba
+### Email marketing
 
-El panel de email marketing envía únicamente a `aylin_santacruz@hotmail.com`; no usa la lista de contactos como destinatarios. El envío requiere una cuenta de [Resend](https://resend.com/), un dominio o dirección de remitente verificados y estas variables configuradas como secretos de la función Neon (nunca en `VITE_*`, `.env.production` ni el frontend):
+El panel mantiene un envío de prueba separado, dirigido únicamente a `aylin_santacruz@hotmail.com`; las campañas reales se envían al segmento seleccionado por el administrador, nunca a esa dirección fija. El envío requiere una cuenta de [Resend](https://resend.com/) y un remitente verificado. Configura estas variables como secretos de la función Neon (nunca en `VITE_*`, `.env.production` ni el frontend):
 
 - `RESEND_API_KEY`: clave API de Resend.
 - `EMAIL_MARKETING_FROM`: remitente verificado, por ejemplo `PetCare <marketing@tu-dominio.com>`.
+- `RESEND_WEBHOOK_SECRET`: secreto de firma que Resend muestra al crear un webhook; opcional para enviar campañas, necesario para mostrar métricas de entrega, apertura, clic, rebote y quejas.
 
-Configúralas al desplegar la función con `--env "RESEND_API_KEY=$env:RESEND_API_KEY" --env "EMAIL_MARKETING_FROM=$env:EMAIL_MARKETING_FROM"`. El panel marca el asunto con `[PRUEBA]`, restringe el destinatario a Aylin y registra los envíos de prueba aparte, sin sumarlos a las campañas reales. Si falta cualquiera de las variables, el formulario permanece desactivado.
+Configúralas al desplegar la función con `--env "RESEND_API_KEY=$env:RESEND_API_KEY" --env "EMAIL_MARKETING_FROM=$env:EMAIL_MARKETING_FROM"` y, cuando quieras activar las métricas, `--env "RESEND_WEBHOOK_SECRET=$env:RESEND_WEBHOOK_SECRET"`. En Resend crea un webhook dirigido a la URL de la función seguida de `/resend` y habilita eventos `email.delivered`, `email.opened`, `email.clicked`, `email.bounced` y `email.complained`. Mantén el secreto del webhook solo en Neon. No se registran métricas simuladas; las aperturas dependen del seguimiento disponible en el cliente de correo.
+
+El envío de prueba marca el asunto `[PRUEBA]`, usa solo el destinatario fijo y no se cuenta como campaña. Para enviar una campaña real, el administrador elige un segmento, revisa asunto y contenido, y confirma explícitamente el envío. El backend vuelve a validar el consentimiento y el email justo antes de cada lote, deduplica las direcciones, limita cada campaña a 500 contactos, envía lotes de hasta 100 y registra destinatarios, errores y eventos. Cada mensaje incluye `{{nombre}}` para personalización opcional y un enlace de baja firmado; bajas y quejas desactivan el consentimiento y excluyen al contacto de futuras campañas. Los conteos de segmento solo incluyen emails válidos, consentimiento activo y contactos no dados de baja.
+
+Los segmentos disponibles son todos los contactos autorizados, contactos nuevos de los últimos 30 días, leads/interesados, clientes, clientes recurrentes y clientes fidelizados. Las etapas de cliente siguen siendo manuales y deben reflejar compras verificadas. No se programan ni envían campañas automáticas.
 
 ## Alcance y datos CRM
 
@@ -49,7 +54,7 @@ Los datos nuevos se escriben en Neon. Al iniciar sesión, si el mismo navegador 
 
 El servidor Vite de desarrollo ofrece credenciales de demostración `admin` / `admin` sin conectarse a Neon; no uses ese modo para datos reales. El build de producción nunca acepta esas credenciales. La web publicada solo estará operativa cuando se despliegue la función y se configure su URL.
 
-El panel permite filtrar la lista por consentimiento de marketing y exportar únicamente los contactos consentidos como CSV. El formulario de correo es exclusivamente para enviar una campaña de prueba a la dirección fija configurada por el negocio; no se envían campañas a contactos del CRM.
+El panel permite filtrar la lista por consentimiento de marketing y exportar únicamente contactos elegibles como CSV. Las campañas reales se construyen y confirman desde la sección Email marketing; la prueba hacia la dirección fija permanece separada.
 
 ## Fase 3: ciclo de vida de contactos
 

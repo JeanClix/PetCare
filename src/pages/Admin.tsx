@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,7 @@ import {
   getCrmData,
   migrateLegacyCrm,
   sendMarketingCampaign,
+  sendMarketingTest,
   setContactLifecycle,
   setContactNotes,
   setCrmLeadStatus,
@@ -23,6 +24,7 @@ import {
   type CrmLeadStatus,
   type CrmLeadType,
   type MessageStatus,
+  type CrmData,
 } from "@/lib/crm";
 
 const statusLabels: Record<CrmLeadStatus, string> = {
@@ -84,7 +86,20 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
-  const [marketing, setMarketing] = useState({ available: false, campaignsSent: 0, emailsSent: 0, testEmailsSent: 0 });
+  const [marketing, setMarketing] = useState<CrmData["marketing"]>({
+    available: false,
+    webhookConfigured: false,
+    campaignsSent: 0,
+    emailsSent: 0,
+    testEmailsSent: 0,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+    bounced: 0,
+    complaints: 0,
+    segmentCounts: { all: 0, newContacts: 0, unconverted: 0, newCustomers: 0, recurringCustomers: 0, loyalCustomers: 0 },
+    campaignHistory: [],
+  });
   const [loading, setLoading] = useState(true);
   const [crmError, setCrmError] = useState("");
   const [activeView, setActiveView] = useState<"leads" | "contacts" | "messages" | "marketing">("leads");
@@ -100,8 +115,8 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   const [contactNotesDraft, setContactNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
 
-  async function refreshCrm() {
-    setLoading(true);
+  async function refreshCrm(showLoading = true) {
+    if (showLoading) setLoading(true);
     setCrmError("");
     try {
       const data = await getCrmData(token);
@@ -113,7 +128,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
     } catch (cause) {
       setCrmError(cause instanceof Error ? cause.message : "No se pudo cargar el CRM.");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }
 
@@ -148,20 +163,14 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
     [contacts],
   );
   const marketingSummary = useMemo(() => ({
-    authorized: contacts.filter((contact) => contact.marketingConsent).length,
+    authorized: marketing.segmentCounts.all,
     newCustomers: contacts.filter((contact) => contact.lifecycle === "cliente").length,
     recurringCustomers: contacts.filter((contact) => contact.lifecycle === "cliente_recurrente").length,
-    eligibleLeadsWithoutConfirmedPurchase: contacts.filter((contact) =>
-      contact.marketingConsent && (contact.lifecycle === "lead" || contact.lifecycle === "interesado"),
-    ).length,
-    eligibleNewCustomers: contacts.filter((contact) => contact.marketingConsent && contact.lifecycle === "cliente").length,
-    eligibleRecurringCustomers: contacts.filter((contact) =>
-      contact.marketingConsent && contact.lifecycle === "cliente_recurrente",
-    ).length,
-    eligibleLoyalCustomers: contacts.filter((contact) =>
-      contact.marketingConsent && contact.lifecycle === "cliente_fidelizado",
-    ).length,
-  }), [contacts]);
+    eligibleLeadsWithoutConfirmedPurchase: marketing.segmentCounts.unconverted,
+    eligibleNewCustomers: marketing.segmentCounts.newCustomers,
+    eligibleRecurringCustomers: marketing.segmentCounts.recurringCustomers,
+    eligibleLoyalCustomers: marketing.segmentCounts.loyalCustomers,
+  }), [contacts, marketing.segmentCounts]);
 
   const contactsById = useMemo(() => new Map(contacts.map((contact) => [contact.id, contact])), [contacts]);
   const selectedContact = selectedContactId ? contactsById.get(selectedContactId) : undefined;
@@ -170,6 +179,10 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   const filteredContacts = useMemo(
     () => contacts.filter((contact) =>
       (contactSegment === "all" || contact.marketingConsent === (contactSegment === "marketing")) &&
+      (contactSegment !== "marketing" || (
+        !contact.marketingUnsubscribedAt &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contact.email)
+      )) &&
       (lifecycleSegment === "all" ||
         (lifecycleSegment === "unconverted"
           ? contact.lifecycle === "lead" || contact.lifecycle === "interesado"
@@ -207,12 +220,6 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
     link.download = "petcare-contactos-con-consentimiento.csv";
     link.click();
     URL.revokeObjectURL(url);
-  }
-
-  function showMarketingSegment(lifecycle?: ContactLifecycle | "unconverted") {
-    setContactSegment("marketing");
-    setLifecycleSegment(lifecycle ?? "all");
-    setActiveView("contacts");
   }
 
   return (
@@ -420,7 +427,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                           value={lead.status}
                           onChange={(e) => {
                             const nextStatus = e.target.value as CrmLeadStatus;
-                            void setCrmLeadStatus(token, lead.id, nextStatus).then(refreshCrm).catch((cause: unknown) => {
+                            void setCrmLeadStatus(token, lead.id, nextStatus).then(() => refreshCrm()).catch((cause: unknown) => {
                               setCrmError(cause instanceof Error ? cause.message : "No se pudo actualizar el lead.");
                             });
                           }}
@@ -516,7 +523,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                           <select
                             value={contact.lifecycle}
                             onChange={(event) => {
-                              void setContactLifecycle(token, contact.id, event.target.value as ContactLifecycle).then(refreshCrm).catch((cause: unknown) => {
+                              void setContactLifecycle(token, contact.id, event.target.value as ContactLifecycle).then(() => refreshCrm()).catch((cause: unknown) => {
                                 setCrmError(cause instanceof Error ? cause.message : "No se pudo actualizar el contacto.");
                               });
                             }}
@@ -594,7 +601,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                             <select
                               value={message.status}
                               onChange={(event) => {
-                                void setMessageStatus(token, message.id, event.target.value as MessageStatus).then(refreshCrm).catch((cause: unknown) => {
+                                void setMessageStatus(token, message.id, event.target.value as MessageStatus).then(() => refreshCrm()).catch((cause: unknown) => {
                                   setCrmError(cause instanceof Error ? cause.message : "No se pudo actualizar el mensaje.");
                                 });
                               }}
@@ -620,8 +627,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
               messages={messages.length}
               marketing={marketing}
               token={token}
-              onSent={() => void refreshCrm()}
-              onShowSegment={showMarketingSegment}
+              onSent={() => void refreshCrm(false)}
             />
           )}
         </div>
@@ -731,7 +737,6 @@ function EmailMarketingDashboard({
   marketing,
   token,
   onSent,
-  onShowSegment,
 }: {
   summary: {
     authorized: number;
@@ -743,30 +748,87 @@ function EmailMarketingDashboard({
     eligibleLoyalCustomers: number;
   };
   messages: number;
-  marketing: { available: boolean; campaignsSent: number; emailsSent: number; testEmailsSent: number };
+  marketing: CrmData["marketing"];
   token: string;
   onSent: () => void;
-  onShowSegment: (lifecycle?: ContactLifecycle | "unconverted") => void;
 }) {
+  const [campaignName, setCampaignName] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [segment, setSegment] = useState<"all" | "new_contacts" | "unconverted" | "new_customers" | "recurring_customers" | "loyal_customers">("all");
+  const [ctaLabel, setCtaLabel] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
   const [sending, setSending] = useState(false);
   const [sendMessage, setSendMessage] = useState("");
   const [sendError, setSendError] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
-  const segments: { label: string; count: number; lifecycle?: ContactLifecycle | "unconverted" }[] = [
-    { label: "Leads sin compra confirmada", count: summary.eligibleLeadsWithoutConfirmedPurchase, lifecycle: "unconverted" },
-    { label: "Clientes nuevos", count: summary.eligibleNewCustomers, lifecycle: "cliente" },
-    { label: "Clientes recurrentes", count: summary.eligibleRecurringCustomers, lifecycle: "cliente_recurrente" },
-    { label: "Clientes fidelizados", count: summary.eligibleLoyalCustomers, lifecycle: "cliente_fidelizado" },
-  ];
+  const segmentOptions = [
+    { id: "all", label: "Todos los contactos autorizados", count: marketing.segmentCounts.all },
+    { id: "new_contacts", label: "Contactos nuevos (últimos 30 días)", count: marketing.segmentCounts.newContacts },
+    { id: "unconverted", label: "Leads e interesados", count: marketing.segmentCounts.unconverted },
+    { id: "new_customers", label: "Clientes", count: marketing.segmentCounts.newCustomers },
+    { id: "recurring_customers", label: "Clientes recurrentes", count: marketing.segmentCounts.recurringCustomers },
+    { id: "loyal_customers", label: "Clientes fidelizados", count: marketing.segmentCounts.loyalCustomers },
+  ] as const;
+  const selectedSegmentCount = segmentOptions.find((option) => option.id === segment)?.count ?? 0;
+
+  async function sendTest() {
+    setSending(true);
+    setSendMessage("");
+    setSendError(false);
+    try {
+      await sendMarketingTest(token, subject, message);
+      setSendMessage("Prueba enviada a aylin_santacruz@hotmail.com. No se contó como campaña.");
+      onSent();
+    } catch (cause) {
+      setSendError(true);
+      setSendMessage(cause instanceof Error ? cause.message : "No se pudo enviar el correo de prueba.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function sendCampaign(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!window.confirm(
+      `Vas a enviar “${subject}” a ${selectedSegmentCount} contactos elegibles. ` +
+      "Solo se incluirán suscriptores con consentimiento activo. ¿Confirmas el envío?",
+    )) return;
+    setSending(true);
+    setSendMessage("");
+    setSendError(false);
+    try {
+      const result = await sendMarketingCampaign(token, {
+        name: campaignName,
+        subject,
+        message,
+        segment,
+        ctaLabel,
+        ctaUrl,
+      });
+      setSendMessage(
+        `Campaña ${result.status === "partial" ? "parcial" : "finalizada"}: ${result.sent} enviados, ${result.failed} fallidos y ${result.skipped} excluidos por baja de consentimiento.`,
+      );
+      setCampaignName("");
+      setSubject("");
+      setMessage("");
+      setCtaLabel("");
+      setCtaUrl("");
+      onSent();
+    } catch (cause) {
+      setSendError(true);
+      setSendMessage(cause instanceof Error ? cause.message : "No se pudo enviar la campaña.");
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <section className="space-y-6 p-5 sm:p-6" aria-labelledby="email-marketing-heading">
       <div>
         <h2 id="email-marketing-heading" className="font-display text-2xl font-black text-primary">Email marketing</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Resumen y segmentos calculados con los contactos, consentimientos y etapas registradas en el CRM.
+          Envía campañas solo a contactos con consentimiento vigente. Ninguna campaña se envía automáticamente.
         </p>
       </div>
 
@@ -775,66 +837,48 @@ function EmailMarketingDashboard({
         <StatCard label="Clientes nuevos" value={summary.newCustomers} tone="green" />
         <StatCard label="Clientes recurrentes" value={summary.recurringCustomers} tone="navy" />
         <StatCard label="Mensajes recibidos" value={messages} tone="sky" />
-        <StatCard label="Campañas enviadas" value="No disponible" tone="navy" />
-        <StatCard label="Emails enviados" value="No disponible" tone="navy" />
+        <StatCard label="Campañas enviadas" value={marketing.campaignsSent} tone="navy" />
+        <StatCard label="Emails aceptados por Resend" value={marketing.emailsSent} tone="navy" />
         <StatCard label="Pruebas enviadas a Aylin" value={marketing.testEmailsSent} tone="sky" />
       </div>
 
       <section className="space-y-3">
         <div>
-          <h3 className="font-display text-lg font-black text-primary">Segmentos elegibles</h3>
-          <p className="text-sm text-muted-foreground">Solo se cuentan contactos con consentimiento de marketing activo.</p>
+          <h3 className="font-display text-lg font-black text-primary">Resultados de campañas</h3>
+          <p className="text-sm text-muted-foreground">
+            {marketing.webhookConfigured
+              ? "Métricas recibidas de eventos firmados de Resend."
+              : "Configura el webhook de Resend para registrar entregas, aperturas, clics, rebotes y quejas."}
+          </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => onShowSegment()}
-            className="rounded-xl border border-border bg-background p-4 text-left transition-colors hover:border-accent"
-          >
-            <span className="block text-sm font-semibold text-muted-foreground">Todos los contactos autorizados</span>
-            <span className="mt-1 block font-display text-2xl font-black text-primary">{summary.authorized}</span>
-          </button>
-          {segments.map((segment) => (
-            <button
-              key={segment.label}
-              type="button"
-              onClick={() => onShowSegment(segment.lifecycle)}
-              className="rounded-xl border border-border bg-background p-4 text-left transition-colors hover:border-accent"
-            >
-              <span className="block text-sm font-semibold text-muted-foreground">{segment.label}</span>
-              <span className="mt-1 block font-display text-2xl font-black text-primary">{segment.count}</span>
-            </button>
-          ))}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard label="Entregados" value={marketing.webhookConfigured ? marketing.delivered : "—"} tone="green" />
+          <StatCard label="Aperturas" value={marketing.webhookConfigured ? marketing.opened : "—"} tone="sky" />
+          <StatCard label="Clics" value={marketing.webhookConfigured ? marketing.clicked : "—"} tone="accent" />
+          <StatCard label="Rebotes" value={marketing.webhookConfigured ? marketing.bounced : "—"} tone="navy" />
+          <StatCard label="Quejas de spam" value={marketing.webhookConfigured ? marketing.complaints : "—"} tone="navy" />
         </div>
       </section>
 
-      <form
-        className="space-y-4 rounded-xl border border-border bg-background p-4"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setSending(true);
-          setSendMessage("");
-          setSendError(false);
-          try {
-            await sendMarketingCampaign(token, subject, message);
-            setSubject("");
-            setMessage("");
-            setSendMessage("Correo de prueba enviado correctamente a aylin_santacruz@hotmail.com.");
-            onSent();
-          } catch (cause) {
-            setSendError(true);
-            setSendMessage(cause instanceof Error ? cause.message : "No se pudo enviar el correo.");
-          } finally {
-            setSending(false);
-          }
-        }}
-      >
+      <form className="space-y-4 rounded-xl border border-border bg-background p-4" onSubmit={sendCampaign}>
         <div>
-          <h3 className="font-display text-lg font-black text-primary">Enviar correo de prueba</h3>
-          <p className="text-sm text-muted-foreground">
-            Se enviará con el asunto marcado [PRUEBA] únicamente a aylin_santacruz@hotmail.com; no se envía a la lista de contactos ni cuenta como campaña.
-          </p>
+          <h3 className="font-display text-lg font-black text-primary">Crear campaña</h3>
+          <p className="text-sm text-muted-foreground">Se envía un mensaje por correo único, con baja incluida. Límite: 500 destinatarios por campaña.</p>
         </div>
+        <label className="block text-sm font-semibold">
+          Nombre interno de la campaña
+          <input required maxLength={120} value={campaignName} onChange={(event) => setCampaignName(event.target.value)}
+            className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 font-normal focus:border-accent focus:outline-none" />
+        </label>
+        <label className="block text-sm font-semibold">
+          Segmento destinatario
+          <select value={segment} onChange={(event) => setSegment(event.target.value as typeof segment)}
+            className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 font-normal focus:border-accent focus:outline-none">
+            {segmentOptions.map((option) => (
+              <option key={option.id} value={option.id}>{option.label} ({option.count})</option>
+            ))}
+          </select>
+        </label>
         <label className="block text-sm font-semibold">
           Asunto
           <input
@@ -849,23 +893,45 @@ function EmailMarketingDashboard({
           Mensaje
           <textarea
             required
-            maxLength={5000}
+            maxLength={6000}
             rows={5}
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             className="mt-1.5 w-full rounded-xl border border-border bg-card p-3 font-normal focus:border-accent focus:outline-none"
           />
         </label>
+        <p className="-mt-2 text-xs text-muted-foreground">Puedes personalizar el nombre con {"{{nombre}}"}.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-semibold">
+            Texto del botón (opcional)
+            <input maxLength={60} value={ctaLabel} onChange={(event) => setCtaLabel(event.target.value)}
+              className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 font-normal focus:border-accent focus:outline-none" />
+          </label>
+          <label className="block text-sm font-semibold">
+            Enlace HTTPS del botón (opcional)
+            <input type="url" maxLength={1000} value={ctaUrl} onChange={(event) => setCtaUrl(event.target.value)}
+              className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 font-normal focus:border-accent focus:outline-none" />
+          </label>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={sending || !marketing.available}>
-            {sending ? "Enviando..." : "Enviar correo"}
+          <Button type="submit" disabled={sending || !marketing.available || selectedSegmentCount === 0 || (Boolean(ctaLabel) !== Boolean(ctaUrl))}>
+            {sending ? "Enviando..." : `Enviar campaña a ${selectedSegmentCount}`}
           </Button>
           {!marketing.available && (
-            <span className="text-sm text-muted-foreground">Configura Resend y despliega la función admin para habilitar los envíos.</span>
+            <span className="text-sm text-muted-foreground">Resend no está configurado en la función Neon.</span>
           )}
-          {sendMessage && <span role={sendError ? "alert" : "status"} className={cn("text-sm", sendError ? "text-danger" : "text-green-700")}>{sendMessage}</span>}
         </div>
       </form>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
+        <p className="mr-auto text-sm text-muted-foreground">
+          Prueba separada, siempre dirigida solo a aylin_santacruz@hotmail.com; lleva [PRUEBA] y no afecta las métricas de campaña.
+        </p>
+        <Button type="button" variant="outline" disabled={sending || !marketing.available || !subject.trim() || !message.trim()} onClick={() => void sendTest()}>
+          {sending ? "Enviando..." : "Enviar prueba"}
+        </Button>
+        {sendMessage && <span role={sendError ? "alert" : "status"} className={cn("basis-full text-sm", sendError ? "text-danger" : "text-green-700")}>{sendMessage}</span>}
+      </div>
 
       <section className="space-y-3 rounded-xl border border-border bg-muted/30 p-4" aria-label="Vista previa del correo">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -892,9 +958,44 @@ function EmailMarketingDashboard({
           previewMode === "mobile" ? "max-w-sm" : "max-w-3xl",
         )}>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista previa · no se envía</p>
-          <h4 className="mt-3 break-words text-lg font-bold">{subject ? `[PRUEBA] ${subject}` : "Asunto del correo"}</h4>
+          <h4 className="mt-3 break-words text-lg font-bold">{subject || "Asunto del correo"}</h4>
           <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed">{message || "El contenido del mensaje aparecerá aquí."}</p>
+          {ctaLabel && <span className="mt-5 inline-block rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white">{ctaLabel}</span>}
+          <p className="mt-8 border-t border-gray-200 pt-3 text-xs text-gray-500">Recibes este correo porque aceptaste comunicaciones de PetCare. Incluirá un enlace para cancelar la suscripción.</p>
         </article>
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="font-display text-lg font-black text-primary">Historial de campañas</h3>
+        {marketing.campaignHistory.length === 0 ? (
+          <p className="rounded-xl border border-border p-4 text-sm text-muted-foreground">Todavía no hay campañas reales.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="bg-muted/50 text-muted-foreground">
+                <tr>
+                  <th className="p-3">Campaña</th><th className="p-3">Fecha</th><th className="p-3">Estado</th>
+                  <th className="p-3">Enviados / destinatarios</th><th className="p-3">Entregados</th>
+                  <th className="p-3">Aperturas</th><th className="p-3">Clics</th><th className="p-3">Fallidos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {marketing.campaignHistory.map((campaign) => (
+                  <tr key={campaign.id}>
+                    <td className="p-3"><span className="block font-semibold">{campaign.name}</span><span className="text-muted-foreground">{campaign.subject}</span></td>
+                    <td className="p-3">{formatDate(campaign.createdAt)}</td>
+                    <td className="p-3">{campaign.status}</td>
+                    <td className="p-3">{campaign.sent} / {campaign.recipientCount}{campaign.skipped ? ` (${campaign.skipped} excluidos)` : ""}</td>
+                    <td className="p-3">{marketing.webhookConfigured ? campaign.delivered : "—"}</td>
+                    <td className="p-3">{marketing.webhookConfigured ? campaign.opened : "—"}</td>
+                    <td className="p-3">{marketing.webhookConfigured ? campaign.clicked : "—"}</td>
+                    <td className="p-3">{campaign.failed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2">

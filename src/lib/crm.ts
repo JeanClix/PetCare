@@ -19,6 +19,7 @@ export type ContactRecord = {
   marketingConsent: boolean;
   marketingConsentAt?: string;
   marketingConsentSource?: string;
+  marketingUnsubscribedAt?: string;
   createdAt: string;
   lastSeenAt: string;
   notes?: string;
@@ -62,9 +63,33 @@ export type CrmData = {
   leads: CrmLead[];
   marketing: {
     available: boolean;
+    webhookConfigured: boolean;
     campaignsSent: number;
     emailsSent: number;
     testEmailsSent: number;
+    delivered: number;
+    opened: number;
+    clicked: number;
+    bounced: number;
+    complaints: number;
+    segmentCounts: Record<"all" | "newContacts" | "unconverted" | "newCustomers" | "recurringCustomers" | "loyalCustomers", number>;
+    campaignHistory: Array<{
+      id: string;
+      name: string;
+      subject: string;
+      segment: string;
+      status: string;
+      recipientCount: number;
+      createdAt: string;
+      sent: number;
+      failed: number;
+      skipped: number;
+      delivered: number;
+      opened: number;
+      clicked: number;
+      bounced: number;
+      complaints: number;
+    }>;
   };
 };
 
@@ -101,7 +126,20 @@ export async function getCrmData(token: string): Promise<CrmData> {
       }
       return { ...lead, total, createdAt: new Date(lead.createdAt).toISOString() };
     }),
-    marketing: result.marketing ?? { available: false, campaignsSent: 0, emailsSent: 0, testEmailsSent: 0 },
+    marketing: result.marketing ?? {
+      available: false,
+      webhookConfigured: false,
+      campaignsSent: 0,
+      emailsSent: 0,
+      testEmailsSent: 0,
+      delivered: 0,
+      opened: 0,
+      clicked: 0,
+      bounced: 0,
+      complaints: 0,
+      segmentCounts: { all: 0, newContacts: 0, unconverted: 0, newCustomers: 0, recurringCustomers: 0, loyalCustomers: 0 },
+      campaignHistory: [],
+    },
   };
 }
 
@@ -137,8 +175,19 @@ export async function setCrmLeadStatus(token: string, id: string, status: CrmLea
   await adminRequest("/crm/lead-status", { id, status }, token);
 }
 
-export function sendMarketingCampaign(token: string, subject: string, message: string) {
-  return adminRequest<{ ok: true }>("/crm/marketing-send", { subject, message }, token);
+export function sendMarketingTest(token: string, subject: string, message: string) {
+  return adminRequest<{ ok: true }>("/crm/marketing-test-send", { subject, message }, token);
+}
+
+export function sendMarketingCampaign(
+  token: string,
+  campaign: { name: string; subject: string; message: string; segment: string; ctaLabel?: string; ctaUrl?: string },
+) {
+  return adminRequest<{ ok: boolean; status: string; sent: number; failed: number; skipped: number }>(
+    "/crm/marketing-send",
+    campaign,
+    token,
+  );
 }
 
 export async function clearCrmData(token: string) {
