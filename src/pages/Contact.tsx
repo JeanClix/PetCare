@@ -31,7 +31,7 @@ import { whatsappLink } from "@/lib/utils";
 type Status =
   | { kind: "idle" }
   | { kind: "sending" }
-  | { kind: "sent"; owner: { firstname: string; lastname: string; email: string } }
+  | { kind: "sent"; owner: { firstname: string; lastname: string; email: string }; whatsappMessage: string }
   | { kind: "whatsapp" }
   | { kind: "error"; message: string; whatsappMessage: string };
 
@@ -128,7 +128,11 @@ export function Contact() {
       return;
     }
 
-    setStatus({ kind: "sent", owner: { firstname: get("firstname"), lastname: get("lastname"), email: get("email") } });
+    setStatus({
+      kind: "sent",
+      owner: { firstname: get("firstname"), lastname: get("lastname"), email: get("email") },
+      whatsappMessage,
+    });
     form.reset();
   }
 
@@ -143,7 +147,11 @@ export function Contact() {
       <Container className="grid gap-10 py-14 sm:py-20 lg:grid-cols-[1.15fr_1fr]">
         <div className="space-y-6">
           {status.kind === "sent" ? (
-            <SentPanel owner={status.owner} onReset={() => setStatus({ kind: "idle" })} />
+            <SentPanel
+              owner={status.owner}
+              whatsappMessage={status.whatsappMessage}
+              onReset={() => setStatus({ kind: "idle" })}
+            />
           ) : (
             <form noValidate onSubmit={handleSubmit} className="h-fit space-y-6 rounded-media bg-card p-6 shadow-soft sm:p-9">
               <fieldset className="space-y-5">
@@ -275,9 +283,11 @@ export function Contact() {
 
 function SentPanel({
   owner,
+  whatsappMessage,
   onReset,
 }: {
   owner: { firstname: string; lastname: string; email: string };
+  whatsappMessage: string;
   onReset: () => void;
 }) {
   // Meetings acepta los datos del contacto por URL para no pedirlos dos veces
@@ -294,13 +304,21 @@ function SentPanel({
           <p className="mt-1.5 text-muted-foreground">
             {meetingsSrc
               ? "Si quieres, elige ahora el horario que más te acomode."
-              : `Te contactaremos al celular que dejaste, en nuestro horario de atención (${business.hours.toLowerCase()}).`}
+              : "Tu solicitud quedó registrada. Puedes coordinar el horario con nuestro equipo por WhatsApp."}
           </p>
         </div>
       </div>
       {meetingsSrc && (
-        <iframe title="Elige el horario de tu cita" src={meetingsSrc} className="h-[680px] w-full rounded-card border-0" />
+        <>
+          <iframe title="Elige el horario de tu cita" src={meetingsSrc} className="h-[680px] w-full rounded-card border-0" />
+          <p className="text-sm text-muted-foreground">
+            Al reservar, HubSpot confirmará el horario según la disponibilidad configurada por PetCare.
+          </p>
+        </>
       )}
+      <ButtonAnchor href={whatsappLink(whatsappMessage)} variant="whatsapp">
+        <WhatsappLogo weight="fill" /> Coordinar por WhatsApp
+      </ButtonAnchor>
       <Button variant="outline" size="sm" onClick={onReset}>
         Agendar otra cita
       </Button>

@@ -154,11 +154,11 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [crmError, setCrmError] = useState("");
-  const [activeView, setActiveView] = useState<"leads" | "contacts" | "messages">("leads");
+  const [activeView, setActiveView] = useState<"leads" | "contacts" | "messages" | "marketing">("leads");
   const [typeFilter, setTypeFilter] = useState<"all" | CrmLeadType>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | CrmLeadStatus>("all");
   const [contactSegment, setContactSegment] = useState<"all" | "marketing" | "non-marketing">("all");
-  const [lifecycleSegment, setLifecycleSegment] = useState<"all" | ContactLifecycle>("all");
+  const [lifecycleSegment, setLifecycleSegment] = useState<"all" | "unconverted" | ContactLifecycle>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [legacyCount, setLegacyCount] = useState(0);
   const [migrationMessage, setMigrationMessage] = useState("");
@@ -213,6 +213,21 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
     ) as Record<ContactLifecycle, number>,
     [contacts],
   );
+  const marketingSummary = useMemo(() => ({
+    authorized: contacts.filter((contact) => contact.marketingConsent).length,
+    newCustomers: contacts.filter((contact) => contact.lifecycle === "cliente").length,
+    recurringCustomers: contacts.filter((contact) => contact.lifecycle === "cliente_recurrente").length,
+    eligibleLeadsWithoutConfirmedPurchase: contacts.filter((contact) =>
+      contact.marketingConsent && (contact.lifecycle === "lead" || contact.lifecycle === "interesado"),
+    ).length,
+    eligibleNewCustomers: contacts.filter((contact) => contact.marketingConsent && contact.lifecycle === "cliente").length,
+    eligibleRecurringCustomers: contacts.filter((contact) =>
+      contact.marketingConsent && contact.lifecycle === "cliente_recurrente",
+    ).length,
+    eligibleLoyalCustomers: contacts.filter((contact) =>
+      contact.marketingConsent && contact.lifecycle === "cliente_fidelizado",
+    ).length,
+  }), [contacts]);
 
   const contactsById = useMemo(() => new Map(contacts.map((contact) => [contact.id, contact])), [contacts]);
   const selectedContact = selectedContactId ? contactsById.get(selectedContactId) : undefined;
@@ -221,7 +236,10 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   const filteredContacts = useMemo(
     () => contacts.filter((contact) =>
       (contactSegment === "all" || contact.marketingConsent === (contactSegment === "marketing")) &&
-      (lifecycleSegment === "all" || contact.lifecycle === lifecycleSegment) &&
+      (lifecycleSegment === "all" ||
+        (lifecycleSegment === "unconverted"
+          ? contact.lifecycle === "lead" || contact.lifecycle === "interesado"
+          : contact.lifecycle === lifecycleSegment)) &&
       (!normalizedSearch || [contact.firstname, contact.lastname, contact.email, contact.phone].some((value) => value.toLowerCase().includes(normalizedSearch))),
     ),
     [contacts, contactSegment, lifecycleSegment, normalizedSearch],
@@ -255,6 +273,12 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
     link.download = "petcare-contactos-con-consentimiento.csv";
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function showMarketingSegment(lifecycle?: ContactLifecycle | "unconverted") {
+    setContactSegment("marketing");
+    setLifecycleSegment(lifecycle ?? "all");
+    setActiveView("contacts");
   }
 
   return (
@@ -300,11 +324,12 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
         </section>
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-media border border-border bg-card p-4 shadow-soft">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Secciones del CRM">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Secciones del CRM y email marketing">
             {([
               ["leads", `Leads (${leads.length})`],
               ["contacts", `Contactos (${contacts.length})`],
               ["messages", `Mensajes (${messages.length})`],
+              ["marketing", "Email marketing"],
             ] as const).map(([view, label]) => (
               <button
                 key={view}
@@ -524,6 +549,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                       className="rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
                     >
                       <option value="all">Todas las etapas</option>
+                      <option value="unconverted">Leads sin compra confirmada</option>
                       {Object.entries(lifecycleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                   </label>
@@ -653,6 +679,14 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
               </div>
             )
           )}
+
+          {!loading && activeView === "marketing" && (
+            <EmailMarketingDashboard
+              summary={marketingSummary}
+              messages={messages.length}
+              onShowSegment={showMarketingSegment}
+            />
+          )}
         </div>
       </Container>
       {selectedContact && (
@@ -754,6 +788,101 @@ function EmptyState({ title, description }: { title: string; description: string
   );
 }
 
+function EmailMarketingDashboard({
+  summary,
+  messages,
+  onShowSegment,
+}: {
+  summary: {
+    authorized: number;
+    newCustomers: number;
+    recurringCustomers: number;
+    eligibleLeadsWithoutConfirmedPurchase: number;
+    eligibleNewCustomers: number;
+    eligibleRecurringCustomers: number;
+    eligibleLoyalCustomers: number;
+  };
+  messages: number;
+  onShowSegment: (lifecycle?: ContactLifecycle | "unconverted") => void;
+}) {
+  const segments: { label: string; count: number; lifecycle?: ContactLifecycle | "unconverted" }[] = [
+    { label: "Leads sin compra confirmada", count: summary.eligibleLeadsWithoutConfirmedPurchase, lifecycle: "unconverted" },
+    { label: "Clientes nuevos", count: summary.eligibleNewCustomers, lifecycle: "cliente" },
+    { label: "Clientes recurrentes", count: summary.eligibleRecurringCustomers, lifecycle: "cliente_recurrente" },
+    { label: "Clientes fidelizados", count: summary.eligibleLoyalCustomers, lifecycle: "cliente_fidelizado" },
+  ];
+
+  return (
+    <section className="space-y-6 p-5 sm:p-6" aria-labelledby="email-marketing-heading">
+      <div>
+        <h2 id="email-marketing-heading" className="font-display text-2xl font-black text-primary">Email marketing</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Resumen y segmentos calculados con los contactos, consentimientos y etapas registradas en el CRM.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard label="Contactos autorizados" value={summary.authorized} tone="accent" />
+        <StatCard label="Clientes nuevos" value={summary.newCustomers} tone="green" />
+        <StatCard label="Clientes recurrentes" value={summary.recurringCustomers} tone="navy" />
+        <StatCard label="Mensajes recibidos" value={messages} tone="sky" />
+        <StatCard label="Campañas enviadas" value="No disponible" tone="navy" />
+        <StatCard label="Emails enviados" value="No disponible" tone="navy" />
+      </div>
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="font-display text-lg font-black text-primary">Segmentos elegibles</h3>
+          <p className="text-sm text-muted-foreground">Solo se cuentan contactos con consentimiento de marketing activo.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => onShowSegment()}
+            className="rounded-xl border border-border bg-background p-4 text-left transition-colors hover:border-accent"
+          >
+            <span className="block text-sm font-semibold text-muted-foreground">Todos los contactos autorizados</span>
+            <span className="mt-1 block font-display text-2xl font-black text-primary">{summary.authorized}</span>
+          </button>
+          {segments.map((segment) => (
+            <button
+              key={segment.label}
+              type="button"
+              onClick={() => onShowSegment(segment.lifecycle)}
+              className="rounded-xl border border-border bg-background p-4 text-left transition-colors hover:border-accent"
+            >
+              <span className="block text-sm font-semibold text-muted-foreground">{segment.label}</span>
+              <span className="mt-1 block font-display text-2xl font-black text-primary">{segment.count}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900">
+        <p className="font-bold">Envíos y métricas aún no disponibles</p>
+        <p className="mt-1">
+          No hay un proveedor de email marketing conectado. Por eso no se crean campañas ni se envían correos desde este panel.
+          Los segmentos solo incluyen contactos con consentimiento; los clientes y compras dependen de la etapa verificada en el CRM.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <UnavailableSegment label="Clientes inactivos" reason="No hay una regla de inactividad definida." />
+        <UnavailableSegment label="Carritos abandonados" reason="El carrito vive en el navegador y no está vinculado a un contacto ni a una compra confirmada." />
+      </div>
+    </section>
+  );
+}
+
+function UnavailableSegment({ label, reason }: { label: string; reason: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/40 p-4">
+      <p className="font-semibold text-primary">{label}</p>
+      <p className="mt-1 text-sm text-muted-foreground">No disponible: {reason}</p>
+    </div>
+  );
+}
+
 function formatDate(value: string) {
   return new Date(value).toLocaleString("es-PE", {
     day: "2-digit",
@@ -782,7 +911,7 @@ function StatCard({
   tone,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   tone: "accent" | "navy" | "green" | "sky";
 }) {
   const classes = {

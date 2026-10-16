@@ -56,6 +56,8 @@ En *Ventas > Reuniones* crea un enlace de programación conectado al calendario 
 
 → `VITE_HUBSPOT_MEETINGS_URL`
 
+La solicitud se guarda primero en Neon y luego se envía al formulario de HubSpot. Si el enlace de Meetings está configurado, la página ofrece el calendario para que el cliente elija un horario; si no, conserva la solicitud y ofrece continuar por WhatsApp. La reserva del horario queda registrada en HubSpot, no como cita confirmada en el CRM de Neon.
+
 ### 6. Cosas que se configuran solo dentro de HubSpot
 
 No necesitan cambios en la web:
