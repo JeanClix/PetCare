@@ -45,6 +45,10 @@ La integración ya está programada en `src/lib/hubspot.ts` y se configura en `.
 
 Sin configurar, todo funciona con WhatsApp como respaldo. Qué sacar de HubSpot y cómo: **[docs/hubspot.md](docs/hubspot.md)**. Los 54 productos para importar están en `docs/hubspot-productos.csv`.
 
+### Panel administrativo
+
+El panel está en `/#/admin`. Para probar el acceso local usa `admin` / `admin`; esas credenciales solo existen en Vite y no habilitan el CRM persistente. Contactos, mensajes y leads nuevos se guardan en PostgreSQL de Neon cuando la función backend está desplegada y `VITE_ADMIN_API_URL` está configurada. La guía **[docs/admin.md](docs/admin.md)** incluye despliegue y migración de los leads locales del navegador. Las etapas de cliente se actualizan manualmente hasta conectar una fuente confiable de compras pagadas.
+
 ## Paleta (extraída del logo)
 
 | Token                 | Color     | Uso                                   |

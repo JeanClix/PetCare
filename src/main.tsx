@@ -5,6 +5,7 @@ import { App } from "@/App";
 import { CartProvider } from "@/context/CartContext";
 import { loadHubSpotTracking } from "@/lib/hubspot";
 import { About } from "@/pages/About";
+import { Admin } from "@/pages/Admin";
 import { Contact } from "@/pages/Contact";
 import { Home } from "@/pages/Home";
 import { NotFound } from "@/pages/NotFound";
@@ -22,6 +23,7 @@ const router = createHashRouter([
       { path: "/servicios", element: <Services /> },
       { path: "/nosotros", element: <About /> },
       { path: "/contacto", element: <Contact /> },
+      { path: "/admin", element: <Admin /> },
       { path: "*", element: <NotFound /> },
     ],
   },

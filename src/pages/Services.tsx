@@ -25,8 +25,8 @@ export function Services() {
   return (
     <>
       <PageHeader
-        title="Medicina, estética y trámites con el mismo equipo"
-        description="Médicos veterinarios titulados y colegiados, equipos de última generación y el trato cercano de siempre."
+        title="Consultas veterinarias, grooming y microchip en Surco"
+        description="Médicos veterinarios titulados y colegiados, equipos de última generación y servicios para perros, gatos y exóticos en Surco, Lima."
         image={{ src: photos.bath, alt: "Golden retriever durante el baño" }}
       >
         <nav className="mt-7 flex flex-wrap gap-2" aria-label="Servicios">
