@@ -11,10 +11,12 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { useEffect, useState, type FormEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button, ButtonAnchor, ButtonLink } from "@/components/ui/Button";
-import { ConsentFields, OwnerFields, validateContact, type ContactErrors } from "@/components/ui/Form";
+import { ConsentFields, Field, inputClass, validateContact, type ContactErrors } from "@/components/ui/Form";
+import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { captureCrmLead } from "@/lib/crm";
+import { createCustomerOrder } from "@/lib/adminAuth";
 import { hubspot, submitHubSpotForm } from "@/lib/hubspot";
 import { formatPrice, whatsappLink } from "@/lib/utils";
 
@@ -25,6 +27,9 @@ type Step = "cart" | "checkout" | "sending" | "done";
 
 export function CartDrawer() {
   const { lines, total, count, isOpen, close, setQty, remove, clear } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState<Step>("cart");
   const [errors, setErrors] = useState<ContactErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -41,6 +46,20 @@ export function CartDrawer() {
     };
   }, [isOpen, close]);
 
+  useEffect(() => {
+    const state = location.state;
+    if (
+      isOpen &&
+      user?.role === "customer" &&
+      state &&
+      typeof state === "object" &&
+      "checkoutAfterLogin" in state
+    ) {
+      setStep("checkout");
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [isOpen, user, location.pathname, location.state, navigate]);
+
   // Al cerrar el panel se vuelve a la vista del carrito
   useEffect(() => {
     if (!isOpen && step !== "sending") {
@@ -56,6 +75,11 @@ export function CartDrawer() {
 
   async function handleCheckout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!user || user.role !== "customer") {
+      close();
+      navigate("/cuenta?next=%2Fcheckout");
+      return;
+    }
     const form = e.currentTarget;
     const data = new FormData(form);
     const found = validateContact(data);
@@ -67,26 +91,18 @@ export function CartDrawer() {
     }
 
     const get = (k: string) => String(data.get(k) ?? "").trim();
-    const owner = `${get("firstname")} ${get("lastname")}`.trim();
-    const lead = {
-      type: "order" as const,
-      channel: "form" as const,
-      firstname: get("firstname"),
-      lastname: get("lastname"),
-      email: get("email"),
-      phone: get("phone"),
-      service: "Pedido de tienda",
-      total,
-      items: orderLines,
-      details: orderMessage,
-      consent: data.get("consent") === "on",
-      marketingConsent: data.get("marketing") === "on",
-    };
+    const owner = `${user.firstname} ${user.lastname}`.trim();
 
     setStep("sending");
     setSubmitError(null);
     try {
-      await captureCrmLead(lead);
+      await createCustomerOrder(user.token, {
+        phone: get("phone"),
+        total,
+        items: orderLines,
+        consent: true,
+        marketingConsent: data.get("marketing") === "on",
+      });
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : "No pudimos guardar tu pedido.");
       setStep("checkout");
@@ -207,7 +223,18 @@ export function CartDrawer() {
                 <span className="text-muted-foreground">Total</span>
                 <span className="font-display text-2xl font-black tabular-nums">{formatPrice(total)}</span>
               </div>
-              <Button size="lg" className="w-full" onClick={() => setStep("checkout")}>
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() => {
+                  if (user?.role !== "customer") {
+                    close();
+                    navigate("/cuenta?next=%2Fcheckout");
+                    return;
+                  }
+                  setStep("checkout");
+                }}
+              >
                 Continuar
               </Button>
             </div>
@@ -218,7 +245,28 @@ export function CartDrawer() {
               <p className="text-sm text-muted-foreground">
                 Registramos tu pedido y te llevamos a WhatsApp para coordinar el pago y el recojo o la entrega.
               </p>
-              <OwnerFields errors={errors} compact />
+              <div className="rounded-xl border border-border bg-background p-4 text-sm">
+                <p className="font-bold">{`${user?.firstname ?? ""} ${user?.lastname ?? ""}`.trim()}</p>
+                <p className="text-muted-foreground">{user?.email}</p>
+                <input type="hidden" name="firstname" value={user?.firstname ?? ""} />
+                <input type="hidden" name="lastname" value={user?.lastname || user?.firstname || ""} />
+                <input type="hidden" name="email" value={user?.email ?? ""} />
+              </div>
+              <Field label="Celular para coordinar el pedido" name="phone" error={errors.phone}>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  required
+                  defaultValue={user?.phone ?? ""}
+                  placeholder="987 654 321"
+                  aria-invalid={!!errors.phone}
+                  aria-describedby={errors.phone ? "phone-error" : undefined}
+                  className={inputClass}
+                />
+              </Field>
               <ConsentFields error={errors.consent} />
               {submitError && (
                 <div role="alert" className="rounded-xl border-2 border-danger/30 px-4 py-3 text-sm">

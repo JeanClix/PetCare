@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 const SESSION_LIFETIME_SECONDS = 60 * 60 * 2;
@@ -18,6 +18,16 @@ type AdminConfig = {
   password: string;
   secret: string;
   databaseUrl: string;
+};
+
+type SessionClaims = {
+  sub: string;
+  exp: number;
+  role: "admin" | "customer";
+  id: string;
+  firstname: string;
+  lastname: string;
+  phone: string;
 };
 
 function getConfig(): AdminConfig | null {
@@ -50,22 +60,52 @@ function sign(payload: string, secret: string) {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-function createSession(email: string, secret: string) {
+function createSession(
+  subject: string,
+  secret: string,
+  identity: Omit<SessionClaims, "sub" | "exp">,
+) {
   const now = Math.floor(Date.now() / 1000);
-  const payload = Buffer.from(JSON.stringify({ sub: email, iat: now, exp: now + SESSION_LIFETIME_SECONDS })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    sub: subject,
+    iat: now,
+    exp: now + SESSION_LIFETIME_SECONDS,
+    ...identity,
+  })).toString("base64url");
   return `${payload}.${sign(payload, secret)}`;
 }
 
-function isValidSession(token: string, secret: string) {
+function readSession(token: string, secret: string): SessionClaims | null {
   const [payload, signature, extra] = token.split(".");
-  if (!payload || !signature || extra) return false;
-  if (!equalSecret(signature, sign(payload, secret))) return false;
+  if (!payload || !signature || extra || !equalSecret(signature, sign(payload, secret))) return null;
   try {
-    const session = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { sub?: unknown; exp?: unknown };
-    return typeof session.sub === "string" && typeof session.exp === "number" && session.exp > Date.now() / 1000;
+    const session = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Partial<SessionClaims>;
+    if (
+      typeof session.sub !== "string" ||
+      typeof session.exp !== "number" ||
+      session.exp <= Date.now() / 1000 ||
+      (session.role !== "admin" && session.role !== "customer") ||
+      typeof session.id !== "string" ||
+      typeof session.firstname !== "string" ||
+      typeof session.lastname !== "string" ||
+      typeof session.phone !== "string"
+    ) return null;
+    return session as SessionClaims;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function hashPassword(password: string, salt = randomBytes(16).toString("hex")) {
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, stored: string) {
+  const [salt, hash, extra] = stored.split(":");
+  if (!salt || !hash || extra || !/^[a-f0-9]{32}$/.test(salt) || !/^[a-f0-9]{128}$/.test(hash)) return false;
+  const candidate = scryptSync(password, salt, 64);
+  return timingSafeEqual(candidate, Buffer.from(hash, "hex"));
 }
 
 function isRateLimited(ip: string) {
@@ -103,6 +143,7 @@ type ContactInput = {
 
 type CaptureMetadata = {
   externalId?: string;
+  accountId?: string;
   createdAt?: string;
   status?: string;
   marketingConsentAt?: string;
@@ -155,8 +196,20 @@ function validateCapture(value: unknown): ContactInput | null {
 
 async function ensureSchema(sql: NeonQueryFunction<false, false>) {
   await sql`
+    CREATE TABLE IF NOT EXISTS petcare_users (
+      id UUID PRIMARY KEY,
+      firstname TEXT NOT NULL,
+      lastname TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      phone TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
     CREATE TABLE IF NOT EXISTS petcare_contacts (
       id UUID PRIMARY KEY,
+      account_id UUID REFERENCES petcare_users(id) ON DELETE SET NULL,
       firstname TEXT NOT NULL,
       lastname TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
@@ -175,6 +228,7 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
       notes TEXT NOT NULL DEFAULT ''
     )
   `;
+  await sql`ALTER TABLE petcare_contacts ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES petcare_users(id) ON DELETE SET NULL`;
   await sql`
     CREATE TABLE IF NOT EXISTS petcare_messages (
       id UUID PRIMARY KEY,
@@ -238,11 +292,11 @@ async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput
   await sql.transaction([
     sql`
       INSERT INTO petcare_contacts (
-        id, firstname, lastname, email, phone, source, lifecycle, lifecycle_updated_at,
+        id, account_id, firstname, lastname, email, phone, source, lifecycle, lifecycle_updated_at,
         lifecycle_reason, engagement_count, order_request_count, marketing_consent,
         marketing_consent_at, marketing_consent_source, created_at, last_seen_at, notes
       ) VALUES (
-        ${contactId}, ${input.firstname}, ${input.lastname}, ${input.email}, ${input.phone}, ${source},
+        ${contactId}, ${metadata.accountId ?? null}::uuid, ${input.firstname}, ${input.lastname}, ${input.email}, ${input.phone}, ${source},
         ${lifecycle}, ${now},
         ${text(metadata.lifecycleReason, 300) || (input.type === "order" ? "Inició una solicitud de pedido" : "Primer contacto capturado")},
         1, ${input.type === "order" ? 1 : 0}, ${input.marketingConsent},
@@ -251,6 +305,7 @@ async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput
         ${text(metadata.notes, 5000)}
       )
       ON CONFLICT (email) DO UPDATE SET
+        account_id = COALESCE(EXCLUDED.account_id, petcare_contacts.account_id),
         firstname = EXCLUDED.firstname,
         lastname = EXCLUDED.lastname,
         phone = EXCLUDED.phone,
@@ -336,18 +391,136 @@ export default {
       const body = await parseJsonBody(request);
       const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
       const password = typeof body?.password === "string" ? body.password : "";
-      if (!equalSecret(email, config.email) || !equalSecret(password, config.password)) {
-        return response({ error: "Correo o contraseña incorrectos." }, 401, origin);
+      if (!email || !password) return response({ error: "Correo o contraseña incorrectos." }, 401, origin);
+      if (equalSecret(email, config.email)) {
+        if (!equalSecret(password, config.password)) {
+          return response({ error: "Correo o contraseña incorrectos." }, 401, origin);
+        }
+        loginAttempts.delete(ip);
+        return response({
+          token: createSession(config.email, config.secret, {
+            role: "admin",
+            id: "admin",
+            firstname: "Administrador",
+            lastname: "",
+            phone: "",
+          }),
+          expiresIn: SESSION_LIFETIME_SECONDS,
+          role: "admin",
+          email: config.email,
+          firstname: "Administrador",
+          lastname: "",
+          phone: "",
+        }, 200, origin);
       }
-      loginAttempts.delete(ip);
-      return response({ token: createSession(config.email, config.secret), expiresIn: SESSION_LIFETIME_SECONDS }, 200, origin);
+
+      try {
+        await ensureSchema(sql);
+        const users = await sql`
+          SELECT id, firstname, lastname, email, password_hash, phone
+          FROM petcare_users WHERE email = ${email} LIMIT 1
+        `;
+        const user = users[0];
+        if (!user || !verifyPassword(password, String(user.password_hash))) {
+          return response({ error: "Correo o contraseña incorrectos." }, 401, origin);
+        }
+        loginAttempts.delete(ip);
+        const identity = {
+          role: "customer" as const,
+          id: String(user.id),
+          firstname: String(user.firstname),
+          lastname: String(user.lastname),
+          phone: String(user.phone ?? ""),
+        };
+        return response({
+          token: createSession(email, config.secret, identity),
+          expiresIn: SESSION_LIFETIME_SECONDS,
+          ...identity,
+          email,
+        }, 200, origin);
+      } catch (error) {
+        console.error("No se pudo iniciar sesión del cliente", error);
+        return response({ error: "No se pudo completar el inicio de sesión." }, 503, origin);
+      }
+    }
+
+    if (action === "register") {
+      const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
+      if (isRateLimited(ip)) return response({ error: "Demasiados intentos. Prueba nuevamente en 15 minutos." }, 429, origin);
+      const contentLength = Number(request.headers.get("Content-Length") ?? 0);
+      if (contentLength > 4096) return response({ error: "Solicitud demasiado grande." }, 413, origin);
+
+      const body = await parseJsonBody(request);
+      const name = text(body?.name, 120);
+      const email = text(body?.email, 254).toLowerCase();
+      const password = typeof body?.password === "string" ? body.password : "";
+      if (
+        name.length < 2 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ||
+        password.length < 12 ||
+        password.length > 128
+      ) {
+        return response({ error: "Ingresa un nombre, correo válido y una contraseña de al menos 12 caracteres." }, 400, origin);
+      }
+      if (equalSecret(email, config.email)) {
+        return response({ error: "Ese correo está reservado para la cuenta administrativa." }, 409, origin);
+      }
+
+      const [firstname, ...lastnames] = name.trim().split(/\s+/);
+      const lastname = lastnames.join(" ");
+      const id = crypto.randomUUID();
+      const contactId = crypto.randomUUID();
+      try {
+        await ensureSchema(sql);
+        const users = await sql`
+          WITH new_user AS (
+            INSERT INTO petcare_users (id, firstname, lastname, email, password_hash)
+            VALUES (${id}::uuid, ${firstname}, ${lastname}, ${email}, ${hashPassword(password)})
+            ON CONFLICT (email) DO NOTHING
+            RETURNING id, firstname, lastname, email, phone
+          ),
+          linked_contact AS (
+            INSERT INTO petcare_contacts (
+              id, account_id, firstname, lastname, email, source, lifecycle,
+              lifecycle_reason, engagement_count, marketing_consent
+            )
+            SELECT ${contactId}::uuid, id, firstname, lastname, email, 'registration', 'lead',
+              'Creó una cuenta de cliente', 1, false
+            FROM new_user
+            ON CONFLICT (email) DO UPDATE SET account_id = EXCLUDED.account_id
+            RETURNING id
+          )
+          SELECT id, firstname, lastname, email, phone FROM new_user
+        `;
+        const user = users[0];
+        if (!user) return response({ error: "Ya existe una cuenta con ese correo. Inicia sesión." }, 409, origin);
+        loginAttempts.delete(ip);
+        const identity = {
+          role: "customer" as const,
+          id: String(user.id),
+          firstname: String(user.firstname),
+          lastname: String(user.lastname),
+          phone: String(user.phone ?? ""),
+        };
+        return response({
+          token: createSession(email, config.secret, identity),
+          expiresIn: SESSION_LIFETIME_SECONDS,
+          ...identity,
+          email,
+        }, 201, origin);
+      } catch (error) {
+        console.error("No se pudo registrar la cuenta de cliente", error);
+        return response({ error: "No se pudo crear la cuenta. Inténtalo nuevamente." }, 503, origin);
+      }
     }
 
     if (action === "capture") {
       const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
       if (isCaptureRateLimited(ip)) return response({ error: "Demasiadas solicitudes. Intenta más tarde." }, 429, origin);
       const input = validateCapture(await parseJsonBody(request));
-      if (!input) return response({ error: "Revisa los datos y autoriza el tratamiento para gestionar tu solicitud." }, 400, origin);
+      if (!input || input.type !== "appointment") {
+        return response({ error: "Solo se aceptan solicitudes de cita públicas; inicia sesión para enviar un pedido." }, 400, origin);
+      }
       try {
         await ensureSchema(sql);
         await capture(sql, input);
@@ -360,10 +533,52 @@ export default {
 
     const authorization = request.headers.get("Authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-    if (!token || !isValidSession(token, config.secret)) {
+    const session = token ? readSession(token, config.secret) : null;
+    if (!session) {
       return response({ error: "La sesión venció. Inicia sesión nuevamente." }, 401, origin);
     }
-    if (action === "verify") return response({ authenticated: true }, 200, origin);
+    if (action === "verify") {
+      const { sub, exp: _expiresAt, ...identity } = session;
+      return response({ authenticated: true, email: sub, ...identity }, 200, origin);
+    }
+
+    if (action === "order") {
+      if (session.role !== "customer") return response({ error: "Inicia sesión con una cuenta de cliente para hacer un pedido." }, 403, origin);
+      const body = await parseJsonBody(request);
+      const phone = text(body?.phone, 32).replace(/\D/g, "");
+      const items = Array.isArray(body?.items) ? body.items.slice(0, 50).map((item) => text(item, 300)).filter(Boolean) : [];
+      const total = typeof body?.total === "number" && Number.isFinite(body.total) ? body.total : Number.NaN;
+      const input = validateCapture({
+        firstname: session.firstname,
+        lastname: session.lastname || session.firstname,
+        email: session.sub,
+        phone,
+        source: "checkout",
+        subject: "Pedido de tienda",
+        message: items.join("\n"),
+        channel: "form",
+        marketingConsent: body?.marketingConsent === true,
+        type: "order",
+        total,
+        items,
+        consent: body?.consent,
+      });
+      if (!input) return response({ error: "Revisa el teléfono del pedido y autoriza el tratamiento para gestionarlo." }, 400, origin);
+
+      try {
+        await ensureSchema(sql);
+        await capture(sql, input, { accountId: session.id });
+        await sql`UPDATE petcare_users SET phone = ${input.phone} WHERE id = ${session.id}::uuid`;
+        return response({ ok: true }, 201, origin);
+      } catch (error) {
+        console.error("No se pudo guardar el pedido de cliente", error);
+        return response({ error: "No pudimos registrar el pedido. Inténtalo nuevamente." }, 503, origin);
+      }
+    }
+
+    if (session.role !== "admin") {
+      return response({ error: "No tienes permisos para administrar el CRM." }, 403, origin);
+    }
 
     try {
       await ensureSchema(sql);

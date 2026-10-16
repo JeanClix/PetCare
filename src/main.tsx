@@ -2,9 +2,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createHashRouter, RouterProvider } from "react-router-dom";
 import { App } from "@/App";
+import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { loadHubSpotTracking } from "@/lib/hubspot";
 import { About } from "@/pages/About";
+import { Account } from "@/pages/Account";
 import { Admin } from "@/pages/Admin";
 import { Contact } from "@/pages/Contact";
 import { Home } from "@/pages/Home";
@@ -23,6 +25,7 @@ const router = createHashRouter([
       { path: "/servicios", element: <Services /> },
       { path: "/nosotros", element: <About /> },
       { path: "/contacto", element: <Contact /> },
+      { path: "/cuenta", element: <Account /> },
       { path: "/admin", element: <Admin /> },
       { path: "*", element: <NotFound /> },
     ],
@@ -33,8 +36,10 @@ loadHubSpotTracking();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <CartProvider>
-      <RouterProvider router={router} />
-    </CartProvider>
+    <AuthProvider>
+      <CartProvider>
+        <RouterProvider router={router} />
+      </CartProvider>
+    </AuthProvider>
   </StrictMode>,
 );

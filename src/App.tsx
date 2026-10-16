@@ -34,6 +34,10 @@ const seoMetaByPath: Record<string, { title: string; description: string }> = {
     description:
       "Agenda una cita veterinaria en Surco, Lima. Consultas, grooming, cirugías, vacunas, microchip y atención a domicilio.",
   },
+  "/cuenta": {
+    title: "Mi cuenta | PetCare",
+    description: "Inicia sesión o crea tu cuenta de cliente PetCare para gestionar tus pedidos.",
+  },
 };
 
 function setMeta(name: string, content: string, kind: "name" | "property" = "name") {
