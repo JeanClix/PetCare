@@ -11,6 +11,7 @@ import {
   getLegacyCrmMigrationCount,
   getCrmData,
   migrateLegacyCrm,
+  sendMarketingCampaign,
   setContactLifecycle,
   setContactNotes,
   setCrmLeadStatus,
@@ -83,6 +84,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [marketing, setMarketing] = useState({ available: false, campaignsSent: 0, emailsSent: 0, testEmailsSent: 0 });
   const [loading, setLoading] = useState(true);
   const [crmError, setCrmError] = useState("");
   const [activeView, setActiveView] = useState<"leads" | "contacts" | "messages" | "marketing">("leads");
@@ -106,6 +108,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
       setLeads(data.leads);
       setContacts(data.contacts);
       setMessages(data.messages);
+      setMarketing(data.marketing);
       setLegacyCount(getLegacyCrmMigrationCount());
     } catch (cause) {
       setCrmError(cause instanceof Error ? cause.message : "No se pudo cargar el CRM.");
@@ -615,6 +618,9 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
             <EmailMarketingDashboard
               summary={marketingSummary}
               messages={messages.length}
+              marketing={marketing}
+              token={token}
+              onSent={() => void refreshCrm()}
               onShowSegment={showMarketingSegment}
             />
           )}
@@ -722,6 +728,9 @@ function EmptyState({ title, description }: { title: string; description: string
 function EmailMarketingDashboard({
   summary,
   messages,
+  marketing,
+  token,
+  onSent,
   onShowSegment,
 }: {
   summary: {
@@ -734,8 +743,17 @@ function EmailMarketingDashboard({
     eligibleLoyalCustomers: number;
   };
   messages: number;
+  marketing: { available: boolean; campaignsSent: number; emailsSent: number; testEmailsSent: number };
+  token: string;
+  onSent: () => void;
   onShowSegment: (lifecycle?: ContactLifecycle | "unconverted") => void;
 }) {
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendMessage, setSendMessage] = useState("");
+  const [sendError, setSendError] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const segments: { label: string; count: number; lifecycle?: ContactLifecycle | "unconverted" }[] = [
     { label: "Leads sin compra confirmada", count: summary.eligibleLeadsWithoutConfirmedPurchase, lifecycle: "unconverted" },
     { label: "Clientes nuevos", count: summary.eligibleNewCustomers, lifecycle: "cliente" },
@@ -759,6 +777,7 @@ function EmailMarketingDashboard({
         <StatCard label="Mensajes recibidos" value={messages} tone="sky" />
         <StatCard label="Campañas enviadas" value="No disponible" tone="navy" />
         <StatCard label="Emails enviados" value="No disponible" tone="navy" />
+        <StatCard label="Pruebas enviadas a Aylin" value={marketing.testEmailsSent} tone="sky" />
       </div>
 
       <section className="space-y-3">
@@ -789,13 +808,94 @@ function EmailMarketingDashboard({
         </div>
       </section>
 
-      <div className="rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900">
-        <p className="font-bold">Envíos y métricas aún no disponibles</p>
-        <p className="mt-1">
-          No hay un proveedor de email marketing conectado. Por eso no se crean campañas ni se envían correos desde este panel.
-          Los segmentos solo incluyen contactos con consentimiento; los clientes y compras dependen de la etapa verificada en el CRM.
-        </p>
-      </div>
+      <form
+        className="space-y-4 rounded-xl border border-border bg-background p-4"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setSending(true);
+          setSendMessage("");
+          setSendError(false);
+          try {
+            await sendMarketingCampaign(token, subject, message);
+            setSubject("");
+            setMessage("");
+            setSendMessage("Correo de prueba enviado correctamente a aylin_santacruz@hotmail.com.");
+            onSent();
+          } catch (cause) {
+            setSendError(true);
+            setSendMessage(cause instanceof Error ? cause.message : "No se pudo enviar el correo.");
+          } finally {
+            setSending(false);
+          }
+        }}
+      >
+        <div>
+          <h3 className="font-display text-lg font-black text-primary">Enviar correo de prueba</h3>
+          <p className="text-sm text-muted-foreground">
+            Se enviará con el asunto marcado [PRUEBA] únicamente a aylin_santacruz@hotmail.com; no se envía a la lista de contactos ni cuenta como campaña.
+          </p>
+        </div>
+        <label className="block text-sm font-semibold">
+          Asunto
+          <input
+            required
+            maxLength={160}
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 font-normal focus:border-accent focus:outline-none"
+          />
+        </label>
+        <label className="block text-sm font-semibold">
+          Mensaje
+          <textarea
+            required
+            maxLength={5000}
+            rows={5}
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-border bg-card p-3 font-normal focus:border-accent focus:outline-none"
+          />
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={sending || !marketing.available}>
+            {sending ? "Enviando..." : "Enviar correo"}
+          </Button>
+          {!marketing.available && (
+            <span className="text-sm text-muted-foreground">Configura Resend y despliega la función admin para habilitar los envíos.</span>
+          )}
+          {sendMessage && <span role={sendError ? "alert" : "status"} className={cn("text-sm", sendError ? "text-danger" : "text-green-700")}>{sendMessage}</span>}
+        </div>
+      </form>
+
+      <section className="space-y-3 rounded-xl border border-border bg-muted/30 p-4" aria-label="Vista previa del correo">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-display text-lg font-black text-primary">Vista previa</h3>
+          <div className="flex gap-2">
+            {(["desktop", "mobile"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={previewMode === mode}
+                onClick={() => setPreviewMode(mode)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-sm font-semibold",
+                  previewMode === mode ? "bg-accent text-white" : "bg-background text-muted-foreground",
+                )}
+              >
+                {mode === "desktop" ? "Escritorio" : "Móvil"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <article className={cn(
+          "mx-auto min-h-40 rounded-xl border border-border bg-white p-5 text-gray-900 shadow-soft",
+          previewMode === "mobile" ? "max-w-sm" : "max-w-3xl",
+        )}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista previa · no se envía</p>
+          <h4 className="mt-3 break-words text-lg font-bold">{subject ? `[PRUEBA] ${subject}` : "Asunto del correo"}</h4>
+          <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed">{message || "El contenido del mensaje aparecerá aquí."}</p>
+        </article>
+      </section>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <UnavailableSegment label="Clientes inactivos" reason="No hay una regla de inactividad definida." />

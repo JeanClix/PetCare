@@ -60,6 +60,12 @@ export type CrmData = {
   contacts: ContactRecord[];
   messages: ContactMessage[];
   leads: CrmLead[];
+  marketing: {
+    available: boolean;
+    campaignsSent: number;
+    emailsSent: number;
+    testEmailsSent: number;
+  };
 };
 
 type CrmApiData = Omit<CrmData, "leads"> & {
@@ -95,6 +101,7 @@ export async function getCrmData(token: string): Promise<CrmData> {
       }
       return { ...lead, total, createdAt: new Date(lead.createdAt).toISOString() };
     }),
+    marketing: result.marketing ?? { available: false, campaignsSent: 0, emailsSent: 0, testEmailsSent: 0 },
   };
 }
 
@@ -128,6 +135,10 @@ export async function setMessageStatus(token: string, id: string, status: Messag
 
 export async function setCrmLeadStatus(token: string, id: string, status: CrmLeadStatus) {
   await adminRequest("/crm/lead-status", { id, status }, token);
+}
+
+export function sendMarketingCampaign(token: string, subject: string, message: string) {
+  return adminRequest<{ ok: true }>("/crm/marketing-send", { subject, message }, token);
 }
 
 export async function clearCrmData(token: string) {
