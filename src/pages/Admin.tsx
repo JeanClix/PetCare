@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { isAdminAuthConfigured } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
 import { hubspot } from "@/lib/hubspot";
+import { AdminAccounts } from "@/pages/AdminAccounts";
 import {
   clearCrmData,
   getLegacyCrmMigrationCount,
@@ -36,12 +37,13 @@ const statusLabels: Record<CrmLeadStatus, string> = {
   closed: "Cerrado",
 };
 
-type AdminView = "dashboard" | "leads" | "contacts" | "messages" | "marketing" | "analytics" | "recommendations";
+type AdminView = "dashboard" | "leads" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations";
 
 const adminViewLabels: Record<AdminView, string> = {
   dashboard: "Dashboard",
   leads: "Pedidos y solicitudes",
   contacts: "Clientes y contactos",
+  accounts: "Cuentas y roles",
   messages: "Mensajes",
   marketing: "Email marketing",
   analytics: "Analítica digital",
@@ -244,6 +246,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                 ["dashboard", "Dashboard", Gauge],
                 ["leads", "Pedidos y solicitudes", ClipboardText],
                 ["contacts", "Clientes y contactos", Users],
+                ["accounts", "Cuentas y roles", Users],
                 ["messages", "Mensajes", ChatCircleDots],
                 ["marketing", "Email marketing", EnvelopeSimple],
                 ["analytics", "Analítica digital", ChartBar],
@@ -282,6 +285,8 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
             <AdminOverview leads={leads} contacts={contacts} messages={messages} />
           )
         )}
+
+        {activeView === "accounts" && <AdminAccounts token={token} />}
 
         {activeView === "dashboard" && <section aria-labelledby="lifecycle-heading" className="space-y-3 rounded-media border border-border bg-card p-5 shadow-soft">
           <div>

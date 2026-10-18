@@ -38,6 +38,10 @@ const seoMetaByPath: Record<string, { title: string; description: string }> = {
     title: "Mi cuenta | PetCare",
     description: "Inicia sesión o crea tu cuenta de cliente PetCare para gestionar tus pedidos.",
   },
+  "/veterinario": {
+    title: "Portal veterinario | PetCare",
+    description: "Acceso de cuenta para el equipo veterinario de PetCare.",
+  },
 };
 
 function setMeta(name: string, content: string, kind: "name" | "property" = "name") {

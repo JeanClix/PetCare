@@ -22,8 +22,12 @@ export function Header() {
   const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
-  const accountLink = user?.role === "admin" ? "/admin" : "/cuenta";
-  const accountLabel = user?.role === "admin" ? "Panel admin" : user ? "Mi cuenta" : "Iniciar sesión";
+  const accountLink = user?.role === "admin" ? "/admin" : user?.role === "veterinarian" ? "/veterinario" : "/cuenta";
+  const accountLabel = user?.role === "admin"
+    ? "Panel admin"
+    : user?.role === "veterinarian"
+      ? "Portal veterinario"
+      : user ? "Mi cuenta" : "Iniciar sesión";
   const navItems = [...nav, { to: accountLink, label: accountLabel }];
 
   useEffect(() => setMenuOpen(false), [pathname]);

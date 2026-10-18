@@ -70,7 +70,7 @@ function adminDevelopmentAuth() {
             return;
           }
 
-          if (path.startsWith("/crm/")) {
+          if (path.startsWith("/crm/") || path === "/accounts" || path === "/account-role") {
             response.writeHead(503);
             response.end(JSON.stringify({ error: "El CRM persistente requiere configurar VITE_ADMIN_API_URL y conectar Neon." }));
             return;
