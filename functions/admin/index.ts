@@ -25,7 +25,7 @@ type AdminConfig = {
 type SessionClaims = {
   sub: string;
   exp: number;
-  role: "admin" | "customer";
+  role: "admin" | "customer" | "veterinarian";
   id: string;
   firstname: string;
   lastname: string;
@@ -121,7 +121,7 @@ function readSession(token: string, secret: string): SessionClaims | null {
       typeof session.sub !== "string" ||
       typeof session.exp !== "number" ||
       session.exp <= Date.now() / 1000 ||
-      (session.role !== "admin" && session.role !== "customer") ||
+      (session.role !== "admin" && session.role !== "customer" && session.role !== "veterinarian") ||
       typeof session.id !== "string" ||
       typeof session.firstname !== "string" ||
       typeof session.lastname !== "string" ||
@@ -240,9 +240,11 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       phone TEXT NOT NULL DEFAULT '',
+      role TEXT NOT NULL DEFAULT 'customer' CHECK (role IN ('customer', 'veterinarian')),
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+  await sql`ALTER TABLE petcare_users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'customer' CHECK (role IN ('customer', 'veterinarian'))`;
   await sql`
     CREATE TABLE IF NOT EXISTS petcare_contacts (
       id UUID PRIMARY KEY,
@@ -631,16 +633,20 @@ export default {
       try {
         await ensureSchema(sql);
         const users = await sql`
-          SELECT id, firstname, lastname, email, password_hash, phone
+          SELECT id, firstname, lastname, email, password_hash, phone, role
           FROM petcare_users WHERE email = ${email} LIMIT 1
         `;
         const user = users[0];
         if (!user || !verifyPassword(password, String(user.password_hash))) {
           return response({ error: "Correo o contraseña incorrectos." }, 401, origin);
         }
+        if (user.role !== "customer" && user.role !== "veterinarian") {
+          console.error("La cuenta tiene un rol no permitido", { email });
+          return response({ error: "No se pudo completar el inicio de sesión." }, 503, origin);
+        }
         loginAttempts.delete(ip);
         const identity = {
-          role: "customer" as const,
+          role: user.role,
           id: String(user.id),
           firstname: String(user.firstname),
           lastname: String(user.lastname),
@@ -688,10 +694,10 @@ export default {
         await ensureSchema(sql);
         const users = await sql`
           WITH new_user AS (
-            INSERT INTO petcare_users (id, firstname, lastname, email, password_hash)
-            VALUES (${id}::uuid, ${firstname}, ${lastname}, ${email}, ${hashPassword(password)})
+            INSERT INTO petcare_users (id, firstname, lastname, email, password_hash, role)
+            VALUES (${id}::uuid, ${firstname}, ${lastname}, ${email}, ${hashPassword(password)}, 'customer')
             ON CONFLICT (email) DO NOTHING
-            RETURNING id, firstname, lastname, email, phone
+            RETURNING id, firstname, lastname, email, phone, role
           ),
           linked_contact AS (
             INSERT INTO petcare_contacts (
@@ -747,9 +753,32 @@ export default {
 
     const authorization = request.headers.get("Authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-    const session = token ? readSession(token, config.secret) : null;
+    let session = token ? readSession(token, config.secret) : null;
     if (!session) {
       return response({ error: "La sesión venció. Inicia sesión nuevamente." }, 401, origin);
+    }
+    if (session.role !== "admin") {
+      try {
+        await ensureSchema(sql);
+        const users = await sql`
+          SELECT role, firstname, lastname, phone
+          FROM petcare_users WHERE id = ${session.id}::uuid AND email = ${session.sub} LIMIT 1
+        `;
+        const user = users[0];
+        if (!user || (user.role !== "customer" && user.role !== "veterinarian")) {
+          return response({ error: "La cuenta ya no está activa. Inicia sesión nuevamente." }, 401, origin);
+        }
+        session = {
+          ...session,
+          role: user.role,
+          firstname: String(user.firstname),
+          lastname: String(user.lastname),
+          phone: String(user.phone ?? ""),
+        };
+      } catch (error) {
+        console.error("No se pudo validar el rol de la cuenta", error);
+        return response({ error: "No se pudo verificar los permisos de la cuenta." }, 503, origin);
+      }
     }
     if (action === "verify") {
       const { sub, exp: _expiresAt, ...identity } = session;
@@ -796,6 +825,28 @@ export default {
 
     try {
       await ensureSchema(sql);
+      if (action === "users") {
+        const users = await sql`
+          SELECT id, firstname, lastname, email, role, created_at AS "createdAt"
+          FROM petcare_users ORDER BY created_at DESC
+        `;
+        return response({ users }, 200, origin);
+      }
+      if (action === "user-role") {
+        const body = await parseJsonBody(request);
+        const id = text(body?.id, 64);
+        const role = body?.role;
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) || (role !== "customer" && role !== "veterinarian")) {
+          return response({ error: "Selecciona una cuenta y un rol válidos." }, 400, origin);
+        }
+        const updated = await sql`
+          UPDATE petcare_users SET role = ${role}
+          WHERE id = ${id}::uuid
+          RETURNING id
+        `;
+        if (updated.length === 0) return response({ error: "No se encontró la cuenta seleccionada." }, 404, origin);
+        return response({ ok: true }, 200, origin);
+      }
       if (action === "read") {
         const [contacts, messages, leads, campaignStats, segmentCounts, campaignHistory] = await Promise.all([
           sql`SELECT id, firstname, lastname, email, phone, source, lifecycle,

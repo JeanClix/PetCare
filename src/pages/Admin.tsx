@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { useAuth } from "@/context/AuthContext";
-import { isAdminAuthConfigured } from "@/lib/adminAuth";
+import { getManagedAccounts, isAdminAuthConfigured, setManagedAccountRole, type ManagedAccount } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
 import { hubspot } from "@/lib/hubspot";
 import {
@@ -36,7 +36,7 @@ const statusLabels: Record<CrmLeadStatus, string> = {
   closed: "Cerrado",
 };
 
-type AdminView = "dashboard" | "leads" | "contacts" | "messages" | "marketing" | "analytics" | "recommendations";
+type AdminView = "dashboard" | "leads" | "contacts" | "messages" | "marketing" | "analytics" | "recommendations" | "users";
 
 const adminViewLabels: Record<AdminView, string> = {
   dashboard: "Dashboard",
@@ -46,6 +46,7 @@ const adminViewLabels: Record<AdminView, string> = {
   marketing: "Email marketing",
   analytics: "Analítica digital",
   recommendations: "Análisis y recomendaciones",
+  users: "Cuentas y roles",
 };
 
 const typeLabels: Record<CrmLeadType, string> = {
@@ -128,6 +129,11 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [contactNotesDraft, setContactNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+  const [managedAccounts, setManagedAccounts] = useState<ManagedAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsError, setAccountsError] = useState("");
+  const [accountsRefresh, setAccountsRefresh] = useState(0);
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
 
   async function refreshCrm(showLoading = true) {
     if (showLoading) setLoading(true);
@@ -149,6 +155,24 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   useEffect(() => {
     void refreshCrm();
   }, [token]);
+
+  useEffect(() => {
+    if (activeView !== "users") return;
+    let active = true;
+    setAccountsLoading(true);
+    setAccountsError("");
+    void getManagedAccounts(token)
+      .then(({ users }) => {
+        if (active) setManagedAccounts(users);
+      })
+      .catch((cause: unknown) => {
+        if (active) setAccountsError(cause instanceof Error ? cause.message : "No se pudieron cargar las cuentas.");
+      })
+      .finally(() => {
+        if (active) setAccountsLoading(false);
+      });
+    return () => { active = false; };
+  }, [activeView, token, accountsRefresh]);
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const filteredLeads = useMemo(
@@ -248,6 +272,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                 ["marketing", "Email marketing", EnvelopeSimple],
                 ["analytics", "Analítica digital", ChartBar],
                 ["recommendations", "Análisis y recomendaciones", Lightbulb],
+                ["users", "Cuentas y roles", Users],
               ] as const).map(([view, label, Icon]) => (
                 <button
                   key={view}
@@ -677,6 +702,27 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
           loading
             ? <div role="status" className="rounded-media border border-border bg-card px-6 py-16 text-center text-muted-foreground shadow-soft">Cargando recomendaciones...</div>
             : <AdminRecommendations leads={leads} messages={messages} />
+        )}
+        {activeView === "users" && (
+          <ManagedAccountsPanel
+            users={managedAccounts}
+            loading={accountsLoading}
+            error={accountsError}
+            changingRoleId={changingRoleId}
+            onRetry={() => setAccountsRefresh((revision) => revision + 1)}
+            onRoleChange={async (account, role) => {
+              setChangingRoleId(account.id);
+              setAccountsError("");
+              try {
+                await setManagedAccountRole(token, account.id, role);
+                setManagedAccounts((current) => current.map((user) => user.id === account.id ? { ...user, role } : user));
+              } catch (cause) {
+                setAccountsError(cause instanceof Error ? cause.message : "No se pudo actualizar el rol.");
+              } finally {
+                setChangingRoleId(null);
+              }
+            }}
+          />
         )}
           </main>
         </div>
@@ -1182,6 +1228,85 @@ function AdminRecommendations({ leads, messages }: { leads: CrmLead[]; messages:
         <p className="mt-2 text-sm text-muted-foreground">No disponible: el sistema registra solicitudes de pedido para coordinar por WhatsApp, pero no pagos completados, cantidades vendidas ni niveles de inventario. No sería fiable proyectar ventas o demanda con esos datos.</p>
         <p className="mt-2 text-sm text-muted-foreground">Para habilitar recomendaciones de desempeño o proyecciones haría falta registrar compras pagadas y sus productos/cantidades, además de existencias; para atribución por producto también se necesitan eventos de visualización y carrito.</p>
       </section>
+    </section>
+  );
+}
+
+function ManagedAccountsPanel({
+  users,
+  loading,
+  error,
+  changingRoleId,
+  onRetry,
+  onRoleChange,
+}: {
+  users: ManagedAccount[];
+  loading: boolean;
+  error: string;
+  changingRoleId: string | null;
+  onRetry: () => void;
+  onRoleChange: (account: ManagedAccount, role: ManagedAccount["role"]) => void;
+}) {
+  return (
+    <section className="space-y-5" aria-labelledby="managed-accounts-heading">
+      <div>
+        <h2 id="managed-accounts-heading" className="font-display text-2xl font-black text-primary">Cuentas y roles</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Las cuentas nuevas son clientes. Verifica la identidad del profesional antes de asignarle el rol de veterinario.
+          El administrador es una cuenta separada y no se puede asignar desde esta lista.
+        </p>
+      </div>
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm">
+          <span className="font-semibold text-danger">{error}</span>
+          <Button size="sm" variant="ghost" onClick={onRetry}>Reintentar</Button>
+        </div>
+      )}
+      <div className="overflow-hidden rounded-media border border-border bg-card shadow-soft">
+        {loading ? (
+          <div role="status" className="px-6 py-16 text-center text-muted-foreground">Cargando cuentas...</div>
+        ) : users.length === 0 ? (
+          <EmptyState title="Aún no hay cuentas registradas" description="Las personas pueden crear una cuenta desde Iniciar sesión → Registrarme. Luego podrás asignar el rol profesional que corresponda." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-muted/60 text-muted-foreground"><tr>
+                <th className="px-4 py-3 font-semibold">Cuenta</th>
+                <th className="px-4 py-3 font-semibold">Registro</th>
+                <th className="px-4 py-3 font-semibold">Rol</th>
+              </tr></thead>
+              <tbody>
+                {users.map((account) => (
+                  <tr key={account.id} className="border-t border-border">
+                    <td className="px-4 py-3">
+                      <span className="font-semibold text-foreground">{`${account.firstname} ${account.lastname}`.trim()}</span>
+                      <span className="block text-muted-foreground">{account.email}</span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{formatDate(account.createdAt)}</td>
+                    <td className="px-4 py-3">
+                      <label className="sr-only" htmlFor={`account-role-${account.id}`}>Rol de {account.email}</label>
+                      <select
+                        id={`account-role-${account.id}`}
+                        value={account.role}
+                        disabled={changingRoleId === account.id}
+                        onChange={(event) => {
+                          const role = event.target.value;
+                          if (role === "customer" || role === "veterinarian") onRoleChange(account, role);
+                        }}
+                        className="rounded-full border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground focus:border-accent focus:outline-none disabled:opacity-60"
+                      >
+                        <option value="customer">Cliente</option>
+                        <option value="veterinarian">Veterinario</option>
+                      </select>
+                      {changingRoleId === account.id && <span className="ml-2 text-xs text-muted-foreground">Guardando...</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

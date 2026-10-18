@@ -28,6 +28,8 @@ export function Account() {
     if (!ready || !user) return;
     if (user.role === "admin") {
       navigate("/admin", { replace: true });
+    } else if (user.role === "veterinarian") {
+      navigate("/veterinario", { replace: true });
     } else if (next === "/checkout") {
       navigate("/tienda", { replace: true, state: { checkoutAfterLogin: true } });
       openCart();
@@ -58,6 +60,9 @@ export function Account() {
 
   if (user?.role === "admin") {
     return <Container className="py-20 text-center text-muted-foreground">Abriendo el panel administrativo...</Container>;
+  }
+  if (user?.role === "veterinarian") {
+    return <Container className="py-20 text-center text-muted-foreground">Abriendo el portal veterinario...</Container>;
   }
 
   if (user?.role === "customer") {

@@ -51,7 +51,7 @@ El panel está en `/#/admin`. Para probar el acceso local usa `admin` / `admin`;
 
 El estado del funnel, la agenda y los módulos pendientes de email marketing están documentados en **[MARKETING_PETCARE.md](MARKETING_PETCARE.md)**.
 
-Los clientes crean una cuenta o inician sesión desde `/#/cuenta`. El correo administrativo se autentica en la misma pantalla y abre el CRM; las cuentas de cliente no tienen acceso administrativo. Para finalizar un pedido hay que iniciar sesión; el carrito se conserva mientras el visitante se autentica y el pedido queda vinculado al contacto del CRM.
+Los clientes crean una cuenta o inician sesión desde `/#/cuenta`. Las cuentas nuevas se crean siempre como clientes; el administrador puede asignar el rol veterinario a cuentas verificadas desde «Cuentas y roles». El portal `/#/veterinario` identifica esas cuentas, pero aún no gestiona agenda ni expedientes clínicos. El correo administrativo se autentica en la misma pantalla y abre el CRM; las cuentas de cliente y veterinario no tienen acceso administrativo. Para finalizar un pedido hay que iniciar sesión como cliente; el carrito se conserva mientras el visitante se autentica y el pedido queda vinculado al contacto del CRM.
 
 ## Paleta (extraída del logo)
 
