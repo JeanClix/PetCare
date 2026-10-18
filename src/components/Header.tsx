@@ -1,4 +1,4 @@
-import { Clock, Handbag, List, Phone, Siren, X } from "@phosphor-icons/react";
+import { Clock, Handbag, List, Phone, Siren, UserCircle, X } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
@@ -24,7 +24,6 @@ export function Header() {
   const { pathname } = useLocation();
   const accountLink = user?.role === "admin" ? "/admin" : "/cuenta";
   const accountLabel = user?.role === "admin" ? "Panel admin" : user ? "Mi cuenta" : "Iniciar sesión";
-  const navItems = [...nav, { to: accountLink, label: accountLabel }];
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -51,7 +50,7 @@ export function Header() {
           <Logo />
 
           <nav className="hidden items-center gap-7 lg:flex" aria-label="Principal">
-            {navItems.map((item) => (
+            {nav.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -78,6 +77,17 @@ export function Header() {
                 </span>
               )}
             </Button>
+            <ButtonLink
+              to={accountLink}
+              variant="ghost"
+              size="sm"
+              aria-label={accountLabel}
+              title={accountLabel}
+              className="gap-1.5 px-2 sm:px-3"
+            >
+              <UserCircle weight="duotone" className="size-5!" />
+              <span className="hidden md:inline">{accountLabel}</span>
+            </ButtonLink>
             <ButtonLink to="/contacto" size="sm" className="ml-2 hidden sm:inline-flex">
               Agendar cita
             </ButtonLink>
@@ -97,7 +107,7 @@ export function Header() {
         {menuOpen && (
           <nav className="animate-fade-up border-t border-border lg:hidden" aria-label="Móvil">
             <Container className="flex flex-col py-3">
-              {navItems.map((item) => (
+              {nav.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
