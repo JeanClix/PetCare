@@ -26,7 +26,7 @@ neon functions deploy admin --project-id $NeonProjectId --branch main --src .neo
 
 No pongas estas variables en `.env`, `.env.production`, el frontend ni en Git. El despliegue pasa las credenciales a Neon como configuración de la función. Al terminar, toma la URL pública que Neon muestra para la función `admin` y configúrala como `VITE_ADMIN_API_URL` en `.env.production` para el deploy de GitHub Pages. Para desarrollo local, define la misma variable en `.env.local`. La URL no es un secreto; `ADMIN_*` y `DATABASE_URL` sí lo son.
 
-En GitHub, guarda la URL pública como variable de repositorio `VITE_ADMIN_API_URL` (Settings → Secrets and variables → Actions → Variables) para que el workflow de Pages la inyecte en el build. Vuelve a publicar el sitio. La función crea las tablas e índices CRM de forma idempotente al atender la primera solicitud; el rol de la conexión necesita permisos para crear tablas e índices. Las rutas `/login`, `/register`, `/verify`, `/capture`, `/account/order` y `/crm/*` pertenecen a la función.
+En GitHub, guarda la URL pública como variable de repositorio `VITE_ADMIN_API_URL` (Settings → Secrets and variables → Actions → Variables) para que el workflow de Pages la inyecte en el build. Vuelve a publicar el sitio. La función crea las tablas e índices CRM de forma idempotente al atender la primera solicitud; el rol de la conexión necesita permisos para crear tablas e índices. Las rutas `/login`, `/register`, `/verify`, `/capture`, `/account/order` y `/crm/*` pertenecen a la función; `/crm/users` lista las cuentas para el administrador y `/crm/user-role` permite cambiar únicamente entre cliente y veterinario.
 
 ### Email marketing
 
