@@ -8,7 +8,7 @@ import {
 
 export type AuthUser = {
   token: string;
-  role: "admin" | "customer";
+  role: "admin" | "customer" | "veterinarian";
   email: string;
   firstname: string;
   lastname: string;

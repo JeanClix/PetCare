@@ -28,6 +28,8 @@ export function Account() {
     if (!ready || !user) return;
     if (user.role === "admin") {
       navigate("/admin", { replace: true });
+    } else if (user.role === "veterinarian") {
+      navigate("/veterinario", { replace: true });
     } else if (next === "/checkout") {
       navigate("/tienda", { replace: true, state: { checkoutAfterLogin: true } });
       openCart();
@@ -56,8 +58,8 @@ export function Account() {
     return <Container className="py-20 text-center text-muted-foreground">Verificando tu sesión...</Container>;
   }
 
-  if (user?.role === "admin") {
-    return <Container className="py-20 text-center text-muted-foreground">Abriendo el panel administrativo...</Container>;
+  if (user && user.role !== "customer") {
+    return <Container className="py-20 text-center text-muted-foreground">Abriendo tu portal...</Container>;
   }
 
   if (user?.role === "customer") {

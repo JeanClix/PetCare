@@ -13,6 +13,7 @@ import { Home } from "@/pages/Home";
 import { NotFound } from "@/pages/NotFound";
 import { Services } from "@/pages/Services";
 import { Shop } from "@/pages/Shop";
+import { VeterinarianPortal } from "@/pages/VeterinarianPortal";
 import "./index.css";
 
 // Hash router: funciona en cualquier hosting estático (GitHub Pages, Netlify) sin configurar redirecciones
@@ -27,6 +28,7 @@ const router = createHashRouter([
       { path: "/contacto", element: <Contact /> },
       { path: "/cuenta", element: <Account /> },
       { path: "/admin", element: <Admin /> },
+      { path: "/veterinario", element: <VeterinarianPortal /> },
       { path: "*", element: <NotFound /> },
     ],
   },

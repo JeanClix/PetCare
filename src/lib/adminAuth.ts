@@ -4,7 +4,7 @@ const adminApiUrl = configuredAdminApiUrl || (import.meta.env.DEV ? "/api/admin"
 export type AccountSession = {
   token: string;
   expiresIn: number;
-  role: "admin" | "customer";
+  role: "admin" | "customer" | "veterinarian";
   email: string;
   firstname: string;
   lastname: string;
@@ -45,7 +45,9 @@ export const isDevelopmentAdminAuth = import.meta.env.DEV && !configuredAdminApi
 function parseAccountSession(result: Partial<AccountSession>, email: string): AccountSession {
   if (!result.token || !result.expiresIn) throw new Error("El servicio devolvió una sesión inválida.");
   const role = result.role ?? (isDevelopmentAdminAuth ? "admin" : undefined);
-  if (role !== "admin" && role !== "customer") throw new Error("El servicio devolvió un tipo de cuenta inválido.");
+  if (role !== "admin" && role !== "customer" && role !== "veterinarian") {
+    throw new Error("El servicio devolvió un tipo de cuenta inválido.");
+  }
   return {
     token: result.token,
     expiresIn: result.expiresIn,
@@ -74,11 +76,35 @@ export async function createCustomerOrder(
   return adminRequest<{ ok: true }>("/account/order", order, token);
 }
 
+export type ManagedAccount = {
+  id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  role: "customer" | "veterinarian";
+  createdAt: string;
+};
+
+export async function getManagedAccounts(token: string) {
+  const result = await adminRequest<{ accounts: ManagedAccount[] }>("/accounts", {}, token);
+  return result.accounts;
+}
+
+export async function setManagedAccountRole(
+  token: string,
+  id: string,
+  role: ManagedAccount["role"],
+) {
+  return adminRequest<{ ok: true }>("/account-role", { id, role }, token);
+}
+
 export async function verifyAccountSession(token: string, email: string) {
   const result = await adminRequest<Partial<AccountSession> & { authenticated?: boolean }>("/verify", {}, token);
   if (!result.authenticated) throw new Error("La sesión venció. Inicia sesión nuevamente.");
   const role = result.role ?? (isDevelopmentAdminAuth ? "admin" : undefined);
-  if (role !== "admin" && role !== "customer") throw new Error("El servicio devolvió un tipo de cuenta inválido.");
+  if (role !== "admin" && role !== "customer" && role !== "veterinarian") {
+    throw new Error("El servicio devolvió un tipo de cuenta inválido.");
+  }
   return {
     role,
     email: result.email ?? email,
