@@ -1030,29 +1030,153 @@ function DigitalAnalytics({
 }
 
 function AdminRecommendations({ leads, messages }: { leads: CrmLead[]; messages: ContactMessage[] }) {
-  const newLeads = leads.filter((lead) => lead.status === "new");
-  const openMessages = messages.filter((message) => message.status === "nuevo" || message.status === "leído");
-  const pendingOrders = newLeads.filter((lead) => lead.type === "order");
-  const insights = [
-    ...(newLeads.length ? [`Tienes ${newLeads.length} solicitudes nuevas sin contactar. Revisa la cola de solicitudes y actualiza su estado después de responder.`] : []),
-    ...(openMessages.length ? [`Hay ${openMessages.length} mensajes en estado nuevo o leído. Atiéndelos y marca su estado para mantener el seguimiento.`] : []),
-    ...(pendingOrders.length ? [`${pendingOrders.length} solicitudes de pedido siguen nuevas. Confirma disponibilidad y pago antes de marcarlas como clientes o ventas.`] : []),
-  ];
+  const thisMonth = new Date();
+  const latestMonth = new Date(thisMonth.getFullYear(), thisMonth.getMonth() - 1, 1);
+  const previousMonth = new Date(thisMonth.getFullYear(), thisMonth.getMonth() - 2, 1);
+  const snapshotForMonth = (month: Date) => {
+    const monthLeads = leads.filter((lead) => {
+      const created = new Date(lead.createdAt);
+      return Number.isFinite(created.getTime()) &&
+        created.getFullYear() === month.getFullYear() &&
+        created.getMonth() === month.getMonth();
+    });
+    const monthMessages = messages.filter((message) => {
+      const created = new Date(message.createdAt);
+      return Number.isFinite(created.getTime()) &&
+        created.getFullYear() === month.getFullYear() &&
+        created.getMonth() === month.getMonth();
+    });
+    return {
+      leads: monthLeads.length,
+      appointments: monthLeads.filter((lead) => lead.type === "appointment").length,
+      orders: monthLeads.filter((lead) => lead.type === "order").length,
+      forms: monthLeads.filter((lead) => lead.channel === "form").length,
+      whatsapp: monthLeads.filter((lead) => lead.channel === "whatsapp").length,
+      untouched: monthLeads.filter((lead) => lead.status === "new").length,
+      openMessages: monthMessages.filter((message) => message.status === "nuevo" || message.status === "leído").length,
+    };
+  };
+  const current = snapshotForMonth(latestMonth);
+  const previous = snapshotForMonth(previousMonth);
+  const latestMonthLabel = latestMonth.toLocaleDateString("es-PE", { month: "long", year: "numeric" });
+  const previousMonthLabel = previousMonth.toLocaleDateString("es-PE", { month: "long", year: "numeric" });
+  const comparison = (now: number, before: number) => {
+    if (before === 0) return now === 0 ? "Sin registros en ambos meses" : `${now} registrados; sin base previa`;
+    const difference = Math.round(((now - before) / before) * 100);
+    return difference === 0 ? "Sin variación" : `${difference > 0 ? "+" : ""}${difference}%`;
+  };
+  const insights: Array<{ title: string; signal: string; action: string }> = [];
+  if (current.leads === 0 && previous.leads === 0) {
+    insights.push({
+      title: "Aún no hay una tendencia CRM que analizar",
+      signal: `No hay solicitudes registradas en ${previousMonthLabel} ni en ${latestMonthLabel}.`,
+      action: "Registra las consultas recibidas y mantén actualizado su canal y estado durante al menos dos meses antes de comparar resultados.",
+    });
+  } else if (current.leads > previous.leads) {
+    insights.push({
+      title: "Creció la demanda de contacto",
+      signal: `Las solicitudes CRM pasaron de ${previous.leads} a ${current.leads} entre ${previousMonthLabel} y ${latestMonthLabel} (${comparison(current.leads, previous.leads)}).`,
+      action: "Revisa la cola de atención y asigna responsables para responder a tiempo. Este aumento indica más solicitudes, no ventas confirmadas.",
+    });
+  } else if (current.leads < previous.leads) {
+    insights.push({
+      title: "Bajó el volumen de solicitudes",
+      signal: `Las solicitudes CRM pasaron de ${previous.leads} a ${current.leads} (${comparison(current.leads, previous.leads)}).`,
+      action: "Compara qué canales y actividades de difusión estuvieron activos en ambos meses; prueba un cambio medible y vuelve a revisar el próximo periodo.",
+    });
+  } else {
+    insights.push({
+      title: "El volumen de solicitudes se mantuvo estable",
+      signal: `Se registraron ${current.leads} solicitudes en cada mes comparado.`,
+      action: "Identifica una mejora concreta en el formulario o seguimiento por WhatsApp y evalúa su efecto con la misma métrica el próximo mes.",
+    });
+  }
+  if (current.orders > previous.orders) {
+    insights.push({
+      title: "Aumentaron las solicitudes de pedido",
+      signal: `Pasaron de ${previous.orders} a ${current.orders}; son pedidos iniciados, no pagos verificados.`,
+      action: "Confirma disponibilidad y da seguimiento a cada solicitud. Para medir ventas, registra por separado cuáles terminan en una compra pagada.",
+    });
+  } else if (previous.orders > 0 && current.orders < previous.orders) {
+    insights.push({
+      title: "Disminuyeron las solicitudes de pedido",
+      signal: `Pasaron de ${previous.orders} a ${current.orders}; el CRM no confirma si los pedidos se pagaron.`,
+      action: "Revisa con el equipo si cambió la disponibilidad, el surtido ofrecido o el seguimiento después de recibir un pedido.",
+    });
+  }
+  if (current.untouched > 0) {
+    insights.push({
+      title: "Hay solicitudes del último mes sin actualizar",
+      signal: `${current.untouched} registros de ${latestMonthLabel} todavía figuran como nuevos.`,
+      action: "Contacta a esas personas y actualiza el estado del CRM. Después podrás distinguir mejor las solicitudes atendidas de las que siguen pendientes.",
+    });
+  }
+  if (current.openMessages > 0) {
+    insights.push({
+      title: "Quedan mensajes por atender",
+      signal: `${current.openMessages} mensajes del último mes siguen como nuevos o leídos.`,
+      action: "Respóndelos y marca su estado para reducir consultas pendientes y conservar un historial útil.",
+    });
+  }
+  const channelTotal = current.forms + current.whatsapp;
+  if (channelTotal > 0) {
+    const dominantChannel = current.forms > current.whatsapp ? "formulario" : "WhatsApp";
+    const dominantCount = Math.max(current.forms, current.whatsapp);
+    if (dominantCount / channelTotal >= 0.7 && current.forms !== current.whatsapp) {
+      insights.push({
+        title: `La mayoría de solicitudes llega por ${dominantChannel}`,
+        signal: `${dominantCount} de ${channelTotal} registros de ${latestMonthLabel} usaron ese canal; esto mide registros CRM, no visitas ni preferencia de todos los clientes.`,
+        action: "Asegura que ese canal tenga una persona responsable y que las consultas recibidas por el otro canal también se registren para poder compararlos.",
+      });
+    }
+  }
   return (
     <section className="space-y-6" aria-labelledby="recommendations-heading">
       <div>
         <h2 id="recommendations-heading" className="font-display text-2xl font-black text-primary">Análisis y recomendaciones</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Observaciones explicables a partir de registros actuales del CRM, sin predicciones simuladas.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Cada oportunidad muestra la señal observada, la comparación y un siguiente paso concreto.</p>
       </div>
-      {insights.length ? (
-        <div className="grid gap-3">{insights.map((insight) => (
-          <article key={insight} className="rounded-media border border-border bg-card p-5 shadow-soft">
-            <p className="font-semibold text-primary">{insight}</p>
+      <section className="overflow-x-auto rounded-media border border-border bg-card p-5 shadow-soft" aria-labelledby="month-comparison-heading">
+        <div>
+          <h3 id="month-comparison-heading" className="font-display text-lg font-black text-primary">Comparación de meses completos</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Compara {latestMonthLabel} con {previousMonthLabel}. Incluye solo solicitudes CRM, no ventas.</p>
+        </div>
+        <table className="mt-4 min-w-full text-left text-sm">
+          <thead className="text-muted-foreground"><tr>
+            <th className="border-b border-border px-3 py-2 font-semibold">Indicador</th>
+            <th className="border-b border-border px-3 py-2 font-semibold">{previousMonthLabel}</th>
+            <th className="border-b border-border px-3 py-2 font-semibold">{latestMonthLabel}</th>
+            <th className="border-b border-border px-3 py-2 font-semibold">Variación</th>
+          </tr></thead>
+          <tbody>
+            {([
+              ["Solicitudes totales", previous.leads, current.leads],
+              ["Solicitudes de pedido (no pagados)", previous.orders, current.orders],
+              ["Solicitudes de cita", previous.appointments, current.appointments],
+              ["Formulario", previous.forms, current.forms],
+              ["WhatsApp", previous.whatsapp, current.whatsapp],
+              ["Aún en estado nuevo", previous.untouched, current.untouched],
+            ] as const).map(([label, before, now]) => (
+              <tr key={label} className="border-b border-border last:border-0">
+                <th scope="row" className="px-3 py-3 font-medium text-foreground">{label}</th>
+                <td className="px-3 py-3 text-muted-foreground">{before}</td>
+                <td className="px-3 py-3 font-bold text-primary">{now}</td>
+                <td className="px-3 py-3 text-muted-foreground">{comparison(now, before)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-3 text-xs text-muted-foreground">Los estados «nuevo» y «cerrado» son seguimiento manual del CRM; «cerrado» no confirma un pago.</p>
+      </section>
+      <div className="grid gap-3">
+        {insights.map((insight) => (
+          <article key={insight.title} className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h3 className="font-display text-lg font-black text-primary">{insight.title}</h3>
+            <p className="mt-2 text-sm text-muted-foreground"><strong className="text-foreground">Señal:</strong> {insight.signal}</p>
+            <p className="mt-2 text-sm text-muted-foreground"><strong className="text-foreground">Siguiente paso:</strong> {insight.action}</p>
           </article>
-        ))}</div>
-      ) : (
-        <EmptyState title="No hay alertas operativas" description="No existen solicitudes nuevas ni mensajes pendientes en los datos disponibles." />
-      )}
+        ))}
+      </div>
       <section className="rounded-media border border-border bg-card p-5 shadow-soft">
         <h3 className="font-display text-lg font-black text-primary">Predicción de ventas y demanda</h3>
         <p className="mt-2 text-sm text-muted-foreground">No disponible: el sistema registra solicitudes de pedido para coordinar por WhatsApp, pero no pagos completados, cantidades vendidas ni niveles de inventario. No sería fiable proyectar ventas o demanda con esos datos.</p>
