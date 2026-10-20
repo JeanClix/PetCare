@@ -28,6 +28,10 @@ No pongas estas variables en `.env`, `.env.production`, el frontend ni en Git. E
 
 En GitHub, guarda la URL pública como variable de repositorio `VITE_ADMIN_API_URL` (Settings → Secrets and variables → Actions → Variables) para que el workflow de Pages la inyecte en el build. Vuelve a publicar el sitio. La función crea las tablas e índices CRM de forma idempotente al atender la primera solicitud; el rol de la conexión necesita permisos para crear tablas e índices. Las rutas `/login`, `/register`, `/verify`, `/capture`, `/account/order` y `/crm/*` pertenecen a la función.
 
+### Migración de roles de cuenta
+
+El cambio de esquema de `petcare_users.role` está versionado en `migrations/20261018_add_petcare_users_role.sql`. Ejecútalo desde el SQL Editor de Neon en la rama asociada al entorno donde se conectará la función `admin` (por ejemplo, `main` para producción). El script es transaccional e idempotente: añade la columna si falta, asigna `customer` a filas sin rol, aplica `customer` como valor predeterminado y restringe los roles a `customer` o `veterinarian`; también puede repetirse si la función ya aplicó el cambio. La base de producción ya tiene esta migración aplicada; no es necesario volver a ejecutarla allí.
+
 ### Email marketing
 
 El panel mantiene un envío de prueba separado, dirigido únicamente a `aylin_santacruz@hotmail.com`; las campañas reales se envían al segmento seleccionado por el administrador, nunca a esa dirección fija. El envío requiere una cuenta de [Resend](https://resend.com/) y un remitente verificado. Configura estas variables como secretos de la función Neon (nunca en `VITE_*`, `.env.production` ni el frontend):
