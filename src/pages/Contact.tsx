@@ -25,24 +25,19 @@ import {
 import type { Pet } from "@/data/products";
 import { business, photos, services } from "@/data/site";
 import { captureCrmLead } from "@/lib/crm";
-import { hubspot, submitHubSpotForm, toHubSpotPhone } from "@/lib/hubspot";
 import { whatsappLink } from "@/lib/utils";
 
 type Status =
   | { kind: "idle" }
   | { kind: "sending" }
   | { kind: "sent"; owner: { firstname: string; lastname: string; email: string }; whatsappMessage: string }
-  | { kind: "whatsapp" }
   | { kind: "error"; message: string; whatsappMessage: string };
 
-// Los valores coinciden con las opciones internas de la propiedad tipo_mascota en HubSpot
 const petOptions: [Pet, string][] = [
   ["perro", "Perro"],
   ["gato", "Gato"],
   ["exotico", "Exótico (ave, reptil, roedor…)"],
 ];
-
-const crmEnabled = Boolean(hubspot.portalId && hubspot.appointmentFormId);
 
 export function Contact() {
   const [params] = useSearchParams();
@@ -78,7 +73,7 @@ export function Contact() {
 
     const lead = {
       type: "appointment" as const,
-      channel: crmEnabled ? "form" as const : "whatsapp" as const,
+      channel: "form" as const,
       firstname: get("firstname"),
       lastname: get("lastname"),
       email: get("email"),
@@ -99,32 +94,6 @@ export function Contact() {
         message: cause instanceof Error ? cause.message : "No pudimos guardar tu solicitud.",
         whatsappMessage,
       });
-      return;
-    }
-
-    if (!crmEnabled) {
-      window.open(whatsappLink(whatsappMessage), "_blank", "noopener");
-      setStatus({ kind: "whatsapp" });
-      return;
-    }
-
-    const result = await submitHubSpotForm(
-      hubspot.appointmentFormId,
-      {
-        firstname: get("firstname"),
-        lastname: get("lastname"),
-        email: get("email"),
-        phone: toHubSpotPhone(get("phone")),
-        tipo_mascota: get("tipo_mascota"),
-        nombre_mascota: get("nombre_mascota"),
-        servicio_interes: get("servicio_interes"),
-        message: get("message"),
-      },
-      { marketing: data.get("marketing") === "on" },
-    );
-
-    if (result.status === "error") {
-      setStatus({ kind: "error", message: result.message, whatsappMessage });
       return;
     }
 
@@ -198,22 +167,13 @@ export function Contact() {
                   <>
                     <CircleNotch weight="bold" className="animate-spin" /> Enviando
                   </>
-                ) : crmEnabled ? (
-                  <>
-                    <PaperPlaneTilt weight="bold" /> Enviar solicitud
-                  </>
                 ) : (
                   <>
-                    <WhatsappLogo weight="fill" /> Enviar por WhatsApp
+                    <PaperPlaneTilt weight="bold" /> Enviar solicitud
                   </>
                 )}
               </Button>
 
-              {status.kind === "whatsapp" && (
-                <p role="status" className="rounded-xl bg-accent-soft px-4 py-3 text-center text-sm font-bold text-accent">
-                  Abrimos WhatsApp con tu solicitud. Solo falta presionar enviar.
-                </p>
-              )}
               {status.kind === "error" && (
                 <div role="alert" className="rounded-xl border-2 border-danger/30 px-4 py-3 text-sm">
                   <p className="font-bold text-danger">{status.message}</p>
@@ -290,11 +250,6 @@ function SentPanel({
   whatsappMessage: string;
   onReset: () => void;
 }) {
-  // Meetings acepta los datos del contacto por URL para no pedirlos dos veces
-  const meetingsSrc = hubspot.meetingsUrl
-    ? `${hubspot.meetingsUrl}?${new URLSearchParams({ embed: "true", ...owner })}`
-    : null;
-
   return (
     <div role="status" className="space-y-6 rounded-media bg-card p-6 shadow-soft sm:p-9">
       <div className="flex gap-4">
@@ -302,20 +257,10 @@ function SentPanel({
         <div>
           <h2 className="text-2xl font-black">Recibimos tu solicitud, {owner.firstname}</h2>
           <p className="mt-1.5 text-muted-foreground">
-            {meetingsSrc
-              ? "Si quieres, elige ahora el horario que más te acomode."
-              : "Tu solicitud quedó registrada. Puedes coordinar el horario con nuestro equipo por WhatsApp."}
+            Tu solicitud quedó registrada. Nuestro equipo te contactará para confirmar el horario, o puedes coordinarlo ahora por WhatsApp.
           </p>
         </div>
       </div>
-      {meetingsSrc && (
-        <>
-          <iframe title="Elige el horario de tu cita" src={meetingsSrc} className="h-[680px] w-full rounded-card border-0" />
-          <p className="text-sm text-muted-foreground">
-            Al reservar, HubSpot confirmará el horario según la disponibilidad configurada por PetCare.
-          </p>
-        </>
-      )}
       <ButtonAnchor href={whatsappLink(whatsappMessage)} variant="whatsapp">
         <WhatsappLogo weight="fill" /> Coordinar por WhatsApp
       </ButtonAnchor>

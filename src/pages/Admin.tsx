@@ -1,14 +1,31 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ChartBar, ChatCircleDots, ClipboardText, EnvelopeSimple, Gauge, Lightbulb, Storefront, Users } from "@phosphor-icons/react";
-import { Link, Navigate } from "react-router-dom";
-import { PageHeader } from "@/components/PageHeader";
+import {
+  ArrowClockwise,
+  CalendarCheck,
+  ChartBar,
+  ChatCircleDots,
+  ClipboardText,
+  EnvelopeSimple,
+  FirstAidKit,
+  Gauge,
+  Lightbulb,
+  UserGear,
+  Users,
+  WhatsappLogo,
+} from "@phosphor-icons/react";
+import { Navigate } from "react-router-dom";
+import { StaffShell, type StaffNavSection } from "@/components/staff/StaffShell";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
-import { useAuth } from "@/context/AuthContext";
-import { isAdminAuthConfigured } from "@/lib/adminAuth";
+import { useAuth, type AuthUser } from "@/context/AuthContext";
+import { isAdminAuthConfigured, isStaffRole, type StaffRole } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
-import { hubspot } from "@/lib/hubspot";
 import { AdminAccounts } from "@/pages/AdminAccounts";
+import { AppointmentsBoard } from "@/pages/AppointmentsBoard";
+import { PatientsView } from "@/pages/clinic/PatientsView";
+import { WhatsappSettings } from "@/pages/WhatsappSettings";
+import { WhatsappComposer } from "@/components/staff/WhatsappComposer";
+import type { WhatsappContext } from "@/lib/whatsapp";
 import {
   clearCrmData,
   getLegacyCrmMigrationCount,
@@ -37,18 +54,29 @@ const statusLabels: Record<CrmLeadStatus, string> = {
   closed: "Cerrado",
 };
 
-type AdminView = "dashboard" | "leads" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations";
+type AdminView = "dashboard" | "leads" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "patients" | "whatsapp";
 
-const adminViewLabels: Record<AdminView, string> = {
-  dashboard: "Dashboard",
-  leads: "Pedidos y solicitudes",
-  contacts: "Clientes y contactos",
-  accounts: "Cuentas y roles",
-  messages: "Mensajes",
-  marketing: "Email marketing",
-  analytics: "Analítica digital",
-  recommendations: "Análisis y recomendaciones",
+const adminViews: Record<AdminView, { label: string; description: string; icon: typeof Gauge; roles: StaffRole[] }> = {
+  dashboard: { label: "Dashboard", description: "Resumen de solicitudes, contactos y mensajes guardados en Neon.", icon: Gauge, roles: ["admin", "sales"] },
+  leads: { label: "Pedidos y solicitudes", description: "Pedidos de la tienda y solicitudes de cita capturadas en la web.", icon: ClipboardText, roles: ["admin", "sales"] },
+  contacts: { label: "Clientes y contactos", description: "Contactos del CRM, etapa del ciclo de vida y consentimiento.", icon: Users, roles: ["admin", "sales"] },
+  messages: { label: "Mensajes", description: "Mensajes recibidos desde formularios y WhatsApp.", icon: ChatCircleDots, roles: ["admin", "sales"] },
+  marketing: { label: "Email marketing", description: "Campañas por segmento con consentimiento verificado.", icon: EnvelopeSimple, roles: ["admin", "sales"] },
+  analytics: { label: "Analítica digital", description: "Actividad registrada por formulario y WhatsApp.", icon: ChartBar, roles: ["admin", "sales"] },
+  recommendations: { label: "Recomendaciones", description: "Pendientes que conviene atender primero.", icon: Lightbulb, roles: ["admin", "sales"] },
+  appointments: { label: "Citas", description: "Solicitudes de cita de los clientes y su estado de atención.", icon: CalendarCheck, roles: ["admin", "sales", "veterinarian"] },
+  patients: { label: "Pacientes", description: "Historial clínico de cada mascota: datos, antecedentes y atenciones.", icon: FirstAidKit, roles: ["admin", "veterinarian"] },
+  whatsapp: { label: "WhatsApp", description: "Número de la clínica enlazado y mensajes enviados desde el panel.", icon: WhatsappLogo, roles: ["admin"] },
+  accounts: { label: "Cuentas y roles", description: "Asigna los roles cliente, administrador, veterinario o ventas.", icon: UserGear, roles: ["admin"] },
 };
+
+const adminSections: Array<{ label: string; views: AdminView[] }> = [
+  { label: "General", views: ["dashboard"] },
+  { label: "Ventas", views: ["leads", "contacts", "messages"] },
+  { label: "Clínica", views: ["appointments", "patients"] },
+  { label: "Marketing", views: ["marketing", "analytics", "recommendations"] },
+  { label: "Administración", views: ["accounts", "whatsapp"] },
+];
 
 const typeLabels: Record<CrmLeadType, string> = {
   appointment: "Cita",
@@ -76,29 +104,30 @@ export function Admin() {
 
   if (!isAdminAuthConfigured()) {
     return (
-      <>
-        <PageHeader title="Panel administrativo" description="El acceso seguro del administrador aún no está configurado." />
-        <Container className="py-14 sm:py-20">
-          <div role="alert" className="mx-auto max-w-xl rounded-media border border-border bg-card p-6 text-center shadow-soft">
-            <p className="font-display text-xl font-black text-primary">Falta configurar el servicio de autenticación</p>
-            <p className="mt-2 text-muted-foreground">
-              Despliega la función administrativa en Neon y configura VITE_ADMIN_API_URL para habilitar el inicio de sesión.
-            </p>
-          </div>
-        </Container>
-      </>
+      <Container className="grid min-h-dvh place-items-center py-14">
+        <div role="alert" className="mx-auto max-w-xl rounded-media border border-border bg-card p-6 text-center shadow-soft">
+          <p className="font-display text-xl font-black text-primary">Falta configurar el servicio de autenticación</p>
+          <p className="mt-2 text-muted-foreground">
+            Despliega la función administrativa en Neon y configura VITE_ADMIN_API_URL para habilitar el inicio de sesión.
+          </p>
+        </div>
+      </Container>
     );
   }
 
   if (!ready) {
-    return <Container className="py-20 text-center text-muted-foreground">Verificando tu sesión...</Container>;
+    return <Container className="grid min-h-dvh place-items-center text-muted-foreground">Verificando tu sesión...</Container>;
   }
 
-  if (!user || user.role !== "admin") return <Navigate to="/cuenta?next=%2Fadmin" replace />;
-  return <AdminDashboard token={user.token} onLogout={logout} />;
+  if (!user) return <Navigate to="/cuenta?next=%2Fadmin" replace />;
+  if (!isStaffRole(user.role)) return <Navigate to="/cuenta" replace />;
+  return <AdminDashboard user={user as AuthUser & { role: StaffRole }} onLogout={logout} />;
 }
 
-function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: string }) {
+function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUser & { role: StaffRole } }) {
+  const { token, role } = user;
+  const canReadCrm = role === "admin" || role === "sales";
+  const isAdmin = role === "admin";
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
@@ -116,9 +145,13 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
     segmentCounts: { all: 0, newContacts: 0, unconverted: 0, newCustomers: 0, recurringCustomers: 0, loyalCustomers: 0 },
     campaignHistory: [],
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(canReadCrm);
   const [crmError, setCrmError] = useState("");
-  const [activeView, setActiveView] = useState<AdminView>("dashboard");
+  const [activeView, setActiveView] = useState<AdminView>(canReadCrm ? "dashboard" : "appointments");
+  const [appointmentsVersion, setAppointmentsVersion] = useState(0);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const clinicAccess = role === "admin" || role === "veterinarian";
+  const [whatsappTarget, setWhatsappTarget] = useState<{ contactId: string; phone?: string; context: WhatsappContext } | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | CrmLeadType>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | CrmLeadStatus>("all");
   const [contactSegment, setContactSegment] = useState<"all" | "marketing" | "non-marketing">("all");
@@ -132,6 +165,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
   const [savingNotes, setSavingNotes] = useState(false);
 
   async function refreshCrm(showLoading = true) {
+    if (!canReadCrm) return;
     if (showLoading) setLoading(true);
     setCrmError("");
     try {
@@ -140,7 +174,7 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
       setContacts(data.contacts);
       setMessages(data.messages);
       setMarketing(data.marketing);
-      setLegacyCount(getLegacyCrmMigrationCount());
+      if (isAdmin) setLegacyCount(getLegacyCrmMigrationCount());
     } catch (cause) {
       setCrmError(cause instanceof Error ? cause.message : "No se pudo cargar el CRM.");
     } finally {
@@ -230,54 +264,49 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
     URL.revokeObjectURL(url);
   }
 
+  const pendingMessages = messages.filter((message) => message.status === "nuevo").length;
+  const newLeads = leads.filter((lead) => lead.status === "new").length;
+  const navSections: StaffNavSection<AdminView>[] = adminSections
+    .map(({ label, views }) => ({
+      label,
+      items: views
+        .filter((view) => adminViews[view].roles.includes(role))
+        .map((view) => ({
+          view,
+          label: adminViews[view].label,
+          icon: adminViews[view].icon,
+          badge: view === "messages" ? pendingMessages : view === "leads" ? newLeads : undefined,
+        })),
+    }))
+    .filter((section) => section.items.length > 0);
+  const current = adminViews[activeView];
+  const showsCrmToolbar = activeView === "leads" || activeView === "contacts" || activeView === "messages";
+
   return (
     <>
-      <PageHeader
-        title="Panel administrativo"
-        description="Gestiona contactos, mensajes, citas y pedidos capturados desde la web de PetCare."
-      />
-
-      <Container className="py-8 sm:py-12">
-        <div className="grid items-start gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
-          <aside className="rounded-media border border-border bg-card p-4 shadow-soft lg:sticky lg:top-28">
-            <p className="px-3 pb-3 font-display text-sm font-black uppercase tracking-wide text-muted-foreground">Administración</p>
-            <nav aria-label="Menú administrativo" className="grid gap-1">
-              {([
-                ["dashboard", "Dashboard", Gauge],
-                ["leads", "Pedidos y solicitudes", ClipboardText],
-                ["contacts", "Clientes y contactos", Users],
-                ["accounts", "Cuentas y roles", Users],
-                ["messages", "Mensajes", ChatCircleDots],
-                ["marketing", "Email marketing", EnvelopeSimple],
-                ["analytics", "Analítica digital", ChartBar],
-                ["recommendations", "Análisis y recomendaciones", Lightbulb],
-              ] as const).map(([view, label, Icon]) => (
-                <button
-                  key={view}
-                  type="button"
-                  aria-current={activeView === view ? "page" : undefined}
-                  onClick={() => setActiveView(view)}
-                  className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-bold transition-colors",
-                    activeView === view ? "bg-accent-soft text-accent" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <Icon weight="bold" className="size-5 shrink-0" />
-                  {label}
-                </button>
-              ))}
-              <Link
-                to="/tienda"
-                className="mt-2 flex min-h-11 items-center gap-3 rounded-xl border-t border-border px-3 pt-3 text-sm font-bold text-primary transition-colors hover:text-accent"
-              >
-                <Storefront weight="bold" className="size-5 shrink-0" />
-                Ver tienda
-              </Link>
-            </nav>
-            <Button variant="ghost" size="sm" className="mt-4 w-full" onClick={onLogout}>Cerrar sesión</Button>
-          </aside>
-
-          <main className="min-w-0 space-y-8">
+      <StaffShell
+        sections={navSections}
+        activeView={activeView}
+        onSelect={setActiveView}
+        title={current.label}
+        description={current.description}
+        user={user}
+        onLogout={onLogout}
+        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "whatsapp" && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => {
+              if (activeView === "appointments") setAppointmentsVersion((value) => value + 1);
+              else void refreshCrm();
+            }}
+          >
+            <ArrowClockwise weight="bold" className={cn(loading && "animate-spin")} />
+            <span className="hidden sm:inline">Actualizar</span>
+          </Button>
+        )}
+      >
         {activeView === "dashboard" && (
           loading ? (
             <div role="status" className="rounded-media border border-border bg-card px-6 py-16 text-center text-muted-foreground shadow-soft">Cargando métricas del CRM...</div>
@@ -286,7 +315,21 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
           )
         )}
 
-        {activeView === "accounts" && <AdminAccounts token={token} />}
+        {activeView === "appointments" && (
+          <AppointmentsBoard
+            key={appointmentsVersion}
+            token={token}
+            clinicAccess={clinicAccess}
+            onOpenPatient={(petId) => {
+              setSelectedPatientId(petId);
+              setActiveView("patients");
+            }}
+          />
+        )}
+        {activeView === "whatsapp" && <WhatsappSettings token={token} />}
+        {activeView === "patients" && <PatientsView token={token} selectedId={selectedPatientId} onSelect={setSelectedPatientId} />}
+
+        {activeView === "accounts" && <AdminAccounts token={token} currentEmail={user.email} />}
 
         {activeView === "dashboard" && <section aria-labelledby="lifecycle-heading" className="space-y-3 rounded-media border border-border bg-card p-5 shadow-soft">
           <div>
@@ -314,13 +357,22 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
           </div>
         </section>}
 
-        {(activeView === "leads" || activeView === "contacts" || activeView === "messages" || activeView === "marketing") && (
-          <>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-media border border-border bg-card p-4 shadow-soft">
-          <p className="font-display text-lg font-black text-primary">{adminViewLabels[activeView]}</p>
-          <Button
+        {showsCrmToolbar && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="block flex-1">
+            <span className="sr-only">Buscar en CRM</span>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Buscar por nombre, correo, teléfono o contenido..."
+              className="h-11 w-full rounded-xl border-2 border-border bg-card px-4 focus:border-accent focus:outline-none"
+            />
+          </label>
+          {isAdmin && <Button
             variant="ghost"
             size="sm"
+            className="text-danger hover:bg-danger/10"
             onClick={async () => {
               if (!window.confirm("¿Seguro que quieres borrar los datos del CRM? Esta acción no se puede deshacer.")) return;
               setCrmError("");
@@ -333,19 +385,8 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
             }}
           >
             Limpiar CRM
-          </Button>
+          </Button>}
         </div>
-        <label className="block">
-          <span className="sr-only">Buscar en CRM</span>
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Buscar por nombre, correo, teléfono o contenido..."
-            className="h-12 w-full rounded-xl border-2 border-border bg-card px-4 shadow-soft focus:border-accent focus:outline-none"
-          />
-        </label>
-          </>
         )}
 
         {crmError && (
@@ -439,6 +480,19 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
                         <p className="font-semibold text-foreground">{lead.owner}</p>
                         <p className="mt-0.5 text-muted-foreground">{lead.email}</p>
                         <p className="text-muted-foreground">{lead.phone || "Sin teléfono"}</p>
+                        {lead.phone && (
+                          <button
+                            type="button"
+                            onClick={() => setWhatsappTarget({
+                              contactId: lead.contactId,
+                              phone: lead.phone,
+                              context: { name: lead.owner, service: lead.service, pet: lead.pet?.replace(/\s*\([^)]*\)\s*$/, ""), total: lead.type === "order" ? lead.total : undefined },
+                            })}
+                            className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold text-[#128C4B] hover:underline"
+                          >
+                            <WhatsappLogo weight="fill" className="size-4" /> WhatsApp
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-bold text-accent">
@@ -676,16 +730,14 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
         {activeView === "analytics" && (
           loading
             ? <div role="status" className="rounded-media border border-border bg-card px-6 py-16 text-center text-muted-foreground shadow-soft">Cargando datos de analítica...</div>
-            : <DigitalAnalytics leads={leads} contacts={contacts} trackingConfigured={Boolean(hubspot.portalId)} />
+            : <DigitalAnalytics leads={leads} contacts={contacts} />
         )}
         {activeView === "recommendations" && (
           loading
             ? <div role="status" className="rounded-media border border-border bg-card px-6 py-16 text-center text-muted-foreground shadow-soft">Cargando recomendaciones...</div>
             : <AdminRecommendations leads={leads} messages={messages} />
         )}
-          </main>
-        </div>
-      </Container>
+      </StaffShell>
       {selectedContact && (
         <div className="fixed inset-0 z-[60] flex justify-end bg-brand-navy-deep/60">
           <section
@@ -704,7 +756,22 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
             <div className="mt-6 grid gap-3 rounded-xl border border-border p-4 text-sm">
               <p className="font-bold">{`${selectedContact.firstname} ${selectedContact.lastname}`.trim()}</p>
               <p>{selectedContact.email}</p>
-              <p>{selectedContact.phone || "Sin teléfono"}</p>
+              <p className="flex flex-wrap items-center gap-x-3">
+                {selectedContact.phone || "Sin teléfono"}
+                {selectedContact.phone && (
+                  <button
+                    type="button"
+                    onClick={() => setWhatsappTarget({
+                      contactId: selectedContact.id,
+                      phone: selectedContact.phone,
+                      context: { name: `${selectedContact.firstname} ${selectedContact.lastname}`.trim() },
+                    })}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#128C4B] hover:underline"
+                  >
+                    <WhatsappLogo weight="fill" className="size-4" /> Escribir por WhatsApp
+                  </button>
+                )}
+              </p>
               <p>Origen: {sourceLabel(selectedContact.source)}</p>
               <p>Registrado: {formatDate(selectedContact.createdAt)}</p>
               <p>Etapa: {lifecycleLabels[selectedContact.lifecycle]}</p>
@@ -780,6 +847,15 @@ function AdminDashboard({ onLogout, token }: { onLogout: () => void; token: stri
             </section>
           </section>
         </div>
+      )}
+      {whatsappTarget && (
+        <WhatsappComposer
+          token={token}
+          contactId={whatsappTarget.contactId}
+          phone={whatsappTarget.phone}
+          context={whatsappTarget.context}
+          onClose={() => setWhatsappTarget(null)}
+        />
       )}
     </>
   );
@@ -983,11 +1059,9 @@ function AdminOverview({
 function DigitalAnalytics({
   leads,
   contacts,
-  trackingConfigured,
 }: {
   leads: CrmLead[];
   contacts: ContactRecord[];
-  trackingConfigured: boolean;
 }) {
   const filter = useDateFilter();
   const visibleLeads = leads.filter((lead) => inBounds(lead.createdAt, filter.range));
@@ -1023,9 +1097,7 @@ function DigitalAnalytics({
       <section className="rounded-media border border-border bg-card p-5 shadow-soft">
         <h3 className="font-display text-lg font-black text-primary">Tráfico web y atribución</h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          {trackingConfigured
-            ? "El script público de seguimiento de HubSpot está configurado en la web. El panel no tiene acceso a su API de informes, por lo que no muestra cifras de visitas, usuarios ni fuentes."
-            : "No hay una plataforma de analítica web configurada para consultar informes desde el panel."}
+          No hay una plataforma de analítica web configurada para consultar informes desde el panel.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">Google Analytics 4 no está integrado. Fuentes de tráfico, páginas visitadas, eventos de carrito, inicio de compra y compras completadas no están disponibles. No se estiman ni se muestran como cero.</p>
       </section>

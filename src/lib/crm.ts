@@ -280,3 +280,17 @@ export async function migrateLegacyCrm(token: string) {
   window.localStorage.setItem("petcare.crm.migratedToNeon", "true");
   return leads.length;
 }
+
+export type Appointment = Pick<CrmLead, "id" | "contactId" | "owner" | "email" | "phone" | "status" | "channel" | "service" | "pet" | "details" | "createdAt"> & {
+  recordId: string | null;
+  recordPetId: string | null;
+};
+
+export async function getAppointments(token: string): Promise<Appointment[]> {
+  const result = await adminRequest<{ appointments: Appointment[] }>("/crm/appointments", {}, token);
+  return result.appointments.map((appointment) => ({ ...appointment, createdAt: new Date(appointment.createdAt).toISOString() }));
+}
+
+export async function setAppointmentStatus(token: string, id: string, status: CrmLeadStatus) {
+  await adminRequest("/crm/appointment-status", { id, status }, token);
+}

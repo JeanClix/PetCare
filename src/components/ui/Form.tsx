@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { business } from "@/data/site";
-import { marketingText } from "@/lib/hubspot";
+import { marketingText } from "@/lib/consent";
 import { cn } from "@/lib/utils";
 
 export const inputClass =
@@ -96,7 +96,7 @@ export function ConsentFields({ error }: { error?: string }) {
             aria-describedby={error ? "consent-error" : undefined}
             className="mt-0.5 size-5 shrink-0 accent-[var(--color-accent)]"
           />
-          {/* Mismo texto que consentText, que es el que queda registrado en HubSpot */}
+          {/* Mismo texto que consentText (src/lib/consent.ts) */}
           <span className="text-muted-foreground">
             Autorizo a Gabus Vet S.A.C. a tratar mis datos personales para gestionar mi solicitud, conforme a la Ley
             N.° 29733 y su{" "}

@@ -28,10 +28,8 @@ jobs:
 
       - run: npm ci
 
-      # La configuración pública de HubSpot se lee de .env.production
+      # La configuración pública (URLs del asistente y de la función admin) se lee de .env.production
       - run: npm run build
-        env:
-          VITE_ADMIN_API_URL: ${{ vars.VITE_ADMIN_API_URL }}
 
       - uses: actions/configure-pages@v6
 

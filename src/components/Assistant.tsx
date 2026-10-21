@@ -16,7 +16,6 @@ const greeting: Message = {
   content: "¡Hola! Cuéntame qué le pasa a tu mascota o qué buscas, y te recomiendo productos y servicios de PetCare.",
 };
 
-// Se abre abajo a la izquierda: la esquina derecha es del chat de HubSpot
 export function Assistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([greeting]);
@@ -32,13 +31,10 @@ export function Assistant() {
   useEffect(() => {
     if (!isOpen) return;
     inputRef.current?.focus();
-    // En móvil el chat de HubSpot quedaría encima del panel (ver index.css)
-    document.body.classList.add("assistant-open");
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setIsOpen(false);
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.classList.remove("assistant-open");
     };
   }, [isOpen]);
 

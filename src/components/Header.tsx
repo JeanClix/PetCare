@@ -1,10 +1,11 @@
-import { Clock, Handbag, List, Phone, Siren, X } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { CaretDown, Clock, Handbag, List, Phone, SignIn, SignOut, Siren, SquaresFour, UserCircle, X } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, type AuthUser } from "@/context/AuthContext";
+import { isStaffRole, roleLabels } from "@/lib/adminAuth";
 import { useCart } from "@/context/CartContext";
 import { business } from "@/data/site";
 import { cn } from "@/lib/utils";
@@ -19,16 +20,12 @@ const nav = [
 
 export function Header() {
   const { count, open } = useCart();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
-  const accountLink = user?.role === "admin" ? "/admin" : user?.role === "veterinarian" ? "/veterinario" : "/cuenta";
-  const accountLabel = user?.role === "admin"
-    ? "Panel admin"
-    : user?.role === "veterinarian"
-      ? "Portal veterinario"
-      : user ? "Mi cuenta" : "Iniciar sesión";
-  const navItems = [...nav, { to: accountLink, label: accountLabel }];
+  const navigate = useNavigate();
+  const navItems = nav;
+  const accountTarget = user && isStaffRole(user.role) ? "/admin" : "/cuenta";
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -74,6 +71,7 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-1">
+            <AccountMenu user={user} onLogout={() => { logout(); navigate("/", { replace: true }); }} />
             <Button variant="ghost" size="icon" className="relative" onClick={open} aria-label={`Carrito, ${count} productos`}>
               <Handbag weight="duotone" className="size-6!" />
               {count > 0 && (
@@ -82,7 +80,8 @@ export function Header() {
                 </span>
               )}
             </Button>
-            <ButtonLink to="/contacto" size="sm" className="ml-2 hidden sm:inline-flex">
+            <span aria-hidden="true" className="mx-2 hidden h-6 w-px bg-border sm:block" />
+            <ButtonLink to="/contacto" size="sm" className="hidden sm:inline-flex">
               Agendar cita
             </ButtonLink>
             <Button
@@ -116,6 +115,18 @@ export function Header() {
                   {item.label}
                 </NavLink>
               ))}
+              <Link
+                to={accountTarget}
+                className="mt-3 flex items-center gap-3 rounded-xl border border-border px-4 py-3"
+              >
+                {user ? <Initials user={user} /> : <UserCircle weight="duotone" className="size-8 text-accent" />}
+                <span className="min-w-0 leading-tight">
+                  <span className="block truncate font-display font-bold">{user ? displayName(user) : "Iniciar sesión"}</span>
+                  <span className="block text-sm text-muted-foreground">
+                    {user ? (isStaffRole(user.role) ? `Ir al panel · ${roleLabels[user.role]}` : "Mi cuenta") : "O crea tu cuenta de cliente"}
+                  </span>
+                </span>
+              </Link>
               <a href={business.emergencyHref} className="mt-3 flex items-center gap-2 rounded-xl bg-accent-soft px-4 py-3 font-bold text-accent">
                 <Siren weight="fill" /> Emergencias {business.emergency}
               </a>
@@ -124,5 +135,108 @@ export function Header() {
         )}
       </div>
     </header>
+  );
+}
+
+function displayName(user: AuthUser) {
+  return `${user.firstname} ${user.lastname}`.trim() || user.email;
+}
+
+function Initials({ user, className }: { user: AuthUser; className?: string }) {
+  const initials = (user.firstname[0] ?? "") + (user.lastname[0] ?? "") || user.email[0];
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "grid size-8 shrink-0 place-items-center rounded-[0.65rem] bg-brand-navy font-display text-[0.8rem] font-black uppercase text-white dark:bg-accent dark:text-accent-foreground",
+        className,
+      )}
+    >
+      {initials}
+    </span>
+  );
+}
+
+/** Acceso de cuenta separado de la navegación: no compite con los enlaces de páginas */
+function AccountMenu({ user, onLogout }: { user: AuthUser | null; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (!user) {
+    return (
+      <Link
+        to="/cuenta"
+        className="hidden h-10 items-center gap-2 rounded-full px-3 font-display text-[0.95rem] font-bold text-foreground transition-colors hover:bg-muted md:inline-flex"
+      >
+        <SignIn weight="bold" className="size-5 text-accent" />
+        Ingresar
+      </Link>
+    );
+  }
+
+  const staff = isStaffRole(user.role);
+  return (
+    <div ref={ref} className="relative hidden md:block">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex h-10 items-center gap-2 rounded-full py-1 pr-2.5 pl-1 transition-colors hover:bg-muted"
+      >
+        <Initials user={user} />
+        <span className="max-w-[8rem] truncate font-display text-[0.95rem] font-bold">{user.firstname || "Mi cuenta"}</span>
+        <CaretDown weight="bold" className={cn("size-3.5 text-muted-foreground transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="animate-fade-up absolute top-[calc(100%+0.5rem)] right-0 w-64 overflow-hidden rounded-card border border-border bg-card shadow-lift"
+        >
+          <div className="border-b border-border px-4 py-3">
+            <p className="truncate font-display font-bold">{displayName(user)}</p>
+            <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+            <span className="mt-2 inline-block rounded-md bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent">
+              {roleLabels[user.role]}
+            </span>
+          </div>
+          <div className="p-1.5">
+            <Link
+              role="menuitem"
+              to={staff ? "/admin" : "/cuenta"}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors hover:bg-muted"
+            >
+              {staff ? <SquaresFour weight="bold" className="size-5 text-accent" /> : <UserCircle weight="bold" className="size-5 text-accent" />}
+              {staff ? "Ir al panel" : "Mi cuenta"}
+            </Link>
+            <button
+              role="menuitem"
+              type="button"
+              onClick={onLogout}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <SignOut weight="bold" className="size-5" />
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

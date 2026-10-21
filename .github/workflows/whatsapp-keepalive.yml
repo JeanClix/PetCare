@@ -1,0 +1,20 @@
+name: Mantener despierto WhatsApp
+
+# Render gratis apaga el servicio tras 15 minutos sin tráfico y la sesión de WhatsApp se cae.
+# Este ping cada 10 minutos lo mantiene encendido. Configura la variable de repositorio
+# WHATSAPP_HEALTH_URL (por ejemplo https://petcare-whatsapp.onrender.com/health) para activarlo.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: ${{ vars.WHATSAPP_HEALTH_URL != '' }}
+    steps:
+      - run: curl --fail --silent --show-error --max-time 90 --retry 2 "$URL"
+        env:
+          URL: ${{ vars.WHATSAPP_HEALTH_URL }}

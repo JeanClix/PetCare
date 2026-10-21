@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  type AccountRole,
   loginAccount,
   registerAccount,
   verifyAccountSession,
@@ -8,7 +9,7 @@ import {
 
 export type AuthUser = {
   token: string;
-  role: "admin" | "customer" | "veterinarian";
+  role: AccountRole;
   email: string;
   firstname: string;
   lastname: string;

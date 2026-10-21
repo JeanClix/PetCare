@@ -1,10 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Assistant } from "@/components/Assistant";
 import { CartDrawer } from "@/components/CartDrawer";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { trackPageView } from "@/lib/hubspot";
 
 const siteUrl = "https://jeanclix.github.io/PetCare";
 
@@ -38,10 +37,6 @@ const seoMetaByPath: Record<string, { title: string; description: string }> = {
     title: "Mi cuenta | PetCare",
     description: "Inicia sesión o crea tu cuenta de cliente PetCare para gestionar tus pedidos.",
   },
-  "/veterinario": {
-    title: "Portal veterinario | PetCare",
-    description: "Acceso de cuenta para el equipo veterinario de PetCare.",
-  },
 };
 
 function setMeta(name: string, content: string, kind: "name" | "property" = "name") {
@@ -57,7 +52,6 @@ function setMeta(name: string, content: string, kind: "name" | "property" = "nam
 
 function ScrollManager() {
   const { pathname, hash } = useLocation();
-  const firstLoad = useRef(true);
 
   useEffect(() => {
     const current = seoMetaByPath[pathname] ?? seoMetaByPath["/"];
@@ -77,15 +71,6 @@ function ScrollManager() {
       link.href = canonicalHref;
       document.head.appendChild(link);
     }
-  }, [pathname]);
-
-  // La primera vista la registra el script de HubSpot al cargar; las siguientes son navegación interna
-  useEffect(() => {
-    if (firstLoad.current) {
-      firstLoad.current = false;
-      return;
-    }
-    trackPageView(pathname);
   }, [pathname]);
 
   useEffect(() => {

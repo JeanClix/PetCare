@@ -1,0 +1,25 @@
+{
+  "name": "petcare-whatsapp",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Servicio de WhatsApp de PetCare (Baileys) con la sesión guardada en Neon",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --packages=external --outfile=dist/index.js",
+    "start": "node dist/index.js",
+    "dev": "npm run build && node --env-file=.env dist/index.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "baileys": "7.0.0-rc14",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/qrcode": "^1.5.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.0"
+  }
+}

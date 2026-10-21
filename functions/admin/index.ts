@@ -22,10 +22,36 @@ type AdminConfig = {
   databaseUrl: string;
 };
 
+const ACCOUNT_ROLES = ["customer", "admin", "veterinarian", "sales"] as const;
+type AccountRole = typeof ACCOUNT_ROLES[number];
+
+// Historia clínica: solo veterinarios y administradores (ventas no ve datos clínicos)
+const CLINIC_ACTIONS = ["clinic-owners", "patients", "patient", "pet-save", "clinical-record"];
+const PET_SPECIES = ["perro", "gato", "exotico", "otro"];
+const PET_SEXES = ["macho", "hembra", "desconocido"];
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// WhatsApp: todo el equipo escribe a clientes; solo el administrador enlaza o desvincula el número
+const WHATSAPP_SEND_ACTIONS = ["whatsapp-send", "whatsapp-history"];
+
+// Qué secciones del panel interno puede usar cada rol de staff
+const STAFF_PERMISSIONS: Record<Exclude<AccountRole, "customer">, ReadonlySet<string>> = {
+  admin: new Set([
+    "accounts", "account-role", "read", "appointments", "appointment-status", "marketing-test-send", "marketing-send",
+    "lifecycle", "contact-notes", "message-status", "lead-status", "clear", "import-lead",
+    ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS, "whatsapp-status", "whatsapp-logout",
+  ]),
+  sales: new Set([
+    "read", "appointments", "appointment-status", "marketing-test-send", "marketing-send",
+    "lifecycle", "contact-notes", "message-status", "lead-status", ...WHATSAPP_SEND_ACTIONS,
+  ]),
+  veterinarian: new Set(["appointments", "appointment-status", ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS]),
+};
+
 type SessionClaims = {
   sub: string;
   exp: number;
-  role: "admin" | "customer" | "veterinarian";
+  role: AccountRole;
   id: string;
   firstname: string;
   lastname: string;
@@ -121,7 +147,7 @@ function readSession(token: string, secret: string): SessionClaims | null {
       typeof session.sub !== "string" ||
       typeof session.exp !== "number" ||
       session.exp <= Date.now() / 1000 ||
-      (session.role !== "admin" && session.role !== "customer" && session.role !== "veterinarian") ||
+      !accountRole(session.role) ||
       typeof session.id !== "string" ||
       typeof session.firstname !== "string" ||
       typeof session.lastname !== "string" ||
@@ -133,13 +159,38 @@ function readSession(token: string, secret: string): SessionClaims | null {
   }
 }
 
+function whatsappService() {
+  const url = process.env.WHATSAPP_SERVICE_URL?.trim().replace(/\/+$/, "");
+  const token = process.env.WHATSAPP_SERVICE_TOKEN?.trim();
+  return url && token ? { url, token } : null;
+}
+
+/** Llama al servicio de WhatsApp (Render); con body hace POST, sin body hace GET */
+async function callWhatsapp(service: { url: string; token: string }, path: string, body?: unknown) {
+  let result: Response;
+  try {
+    result = await fetch(`${service.url}${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { Authorization: `Bearer ${service.token}`, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      // Render gratis tarda en despertar; el envío además espera su turno en la cola
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch {
+    throw new Error("El servicio de WhatsApp no responde. Si está en Render gratis, puede estar despertando: intenta en un minuto.");
+  }
+  const data = await result.json().catch(() => null) as { error?: string } | null;
+  if (!result.ok) throw new Error(data?.error ?? "El servicio de WhatsApp rechazó la solicitud.");
+  return data ?? {};
+}
+
 function hashPassword(password: string, salt = randomBytes(16).toString("hex")) {
   const hash = scryptSync(password, salt, 64).toString("hex");
   return `${salt}:${hash}`;
 }
 
-function accountRole(value: unknown): "customer" | "veterinarian" | null {
-  return value === "customer" || value === "veterinarian" ? value : null;
+function accountRole(value: unknown): AccountRole | null {
+  return ACCOUNT_ROLES.includes(value as AccountRole) ? value as AccountRole : null;
 }
 
 function verifyPassword(password: string, stored: string) {
@@ -244,14 +295,24 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       phone TEXT NOT NULL DEFAULT '',
-      role TEXT NOT NULL DEFAULT 'customer' CHECK (role IN ('customer', 'veterinarian')),
+      role TEXT NOT NULL DEFAULT 'customer',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+  await sql`ALTER TABLE petcare_users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'customer'`;
+  // Reemplaza la restricción anterior (customer/veterinarian) por la de los cuatro roles
   await sql`
-    ALTER TABLE petcare_users
-    ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'customer'
-      CHECK (role IN ('customer', 'veterinarian'))
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'petcare_users'::regclass AND conname = 'petcare_users_role_check'
+          AND pg_get_constraintdef(oid) LIKE '%sales%'
+      ) THEN
+        ALTER TABLE petcare_users DROP CONSTRAINT IF EXISTS petcare_users_role_check;
+        ALTER TABLE petcare_users ADD CONSTRAINT petcare_users_role_check
+          CHECK (role IN ('customer', 'admin', 'veterinarian', 'sales'));
+      END IF;
+    END $$
   `;
   await sql`
     CREATE TABLE IF NOT EXISTS petcare_contacts (
@@ -366,6 +427,56 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
   await sql`CREATE INDEX IF NOT EXISTS petcare_messages_contact_created_idx ON petcare_messages (contact_id, created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS petcare_leads_contact_created_idx ON petcare_leads (contact_id, created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS petcare_marketing_campaigns_sent_idx ON petcare_marketing_campaigns (sent_at DESC) WHERE status = 'sent'`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_pets (
+      id UUID PRIMARY KEY,
+      contact_id UUID NOT NULL REFERENCES petcare_contacts(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      species TEXT NOT NULL DEFAULT 'otro' CHECK (species IN ('perro', 'gato', 'exotico', 'otro')),
+      breed TEXT NOT NULL DEFAULT '',
+      sex TEXT NOT NULL DEFAULT 'desconocido' CHECK (sex IN ('macho', 'hembra', 'desconocido')),
+      birth_date DATE,
+      background TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_clinical_records (
+      id UUID PRIMARY KEY,
+      pet_id UUID NOT NULL REFERENCES petcare_pets(id) ON DELETE CASCADE,
+      appointment_id UUID REFERENCES petcare_leads(id) ON DELETE SET NULL,
+      veterinarian_id TEXT NOT NULL,
+      veterinarian_name TEXT NOT NULL,
+      visited_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      reason TEXT NOT NULL,
+      weight_kg NUMERIC(6, 2),
+      temperature_c NUMERIC(4, 1),
+      diagnosis TEXT NOT NULL DEFAULT '',
+      treatment TEXT NOT NULL DEFAULT '',
+      comments TEXT NOT NULL DEFAULT '',
+      next_visit DATE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS petcare_pets_contact_idx ON petcare_pets (contact_id)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_whatsapp_messages (
+      id UUID PRIMARY KEY,
+      contact_id UUID REFERENCES petcare_contacts(id) ON DELETE SET NULL,
+      phone TEXT NOT NULL,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('sent', 'failed')),
+      error TEXT NOT NULL DEFAULT '',
+      provider_id TEXT,
+      sent_by_id TEXT NOT NULL,
+      sent_by_name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS petcare_whatsapp_messages_contact_idx ON petcare_whatsapp_messages (contact_id, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS petcare_clinical_records_pet_idx ON petcare_clinical_records (pet_id, visited_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS petcare_clinical_records_appointment_idx ON petcare_clinical_records (appointment_id)`;
 }
 
 async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput, metadata: CaptureMetadata = {}) {
@@ -716,7 +827,7 @@ export default {
             ON CONFLICT (email) DO UPDATE SET account_id = EXCLUDED.account_id
             RETURNING id
           )
-          SELECT id, firstname, lastname, email, phone FROM new_user
+          SELECT id, firstname, lastname, email, phone, role FROM new_user
         `;
         const user = users[0];
         if (!user) return response({ error: "Ya existe una cuenta con ese correo. Inicia sesión." }, 409, origin);
@@ -839,8 +950,9 @@ export default {
       }
     }
 
-    if (activeSession.role !== "admin") {
-      return response({ error: "No tienes permisos para administrar el CRM." }, 403, origin);
+    const permissions = activeSession.role === "customer" ? null : STAFF_PERMISSIONS[activeSession.role];
+    if (!permissions?.has(action)) {
+      return response({ error: "Tu rol no tiene acceso a esta sección." }, 403, origin);
     }
 
     try {
@@ -874,12 +986,224 @@ export default {
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) || !role) {
           return response({ error: "Cuenta o rol inválido." }, 400, origin);
         }
+        if (id === activeSession.id) {
+          return response({ error: "No puedes cambiar el rol de tu propia cuenta." }, 409, origin);
+        }
         const updated = await sql`
           UPDATE petcare_users SET role = ${role}
           WHERE id = ${id}::uuid
           RETURNING id
         `;
         if (!updated.length) return response({ error: "No se encontró la cuenta." }, 404, origin);
+        return response({ ok: true }, 200, origin);
+      }
+      if (action === "appointments") {
+        const appointments = await sql`
+          SELECT l.id, l.contact_id AS "contactId",
+            concat_ws(' ', c.firstname, c.lastname) AS owner, c.email, c.phone,
+            l.type, l.status, l.channel, l.service, l.pet, l.details, l.created_at AS "createdAt",
+            r.id AS "recordId", r.pet_id AS "recordPetId"
+          FROM petcare_leads l JOIN petcare_contacts c ON c.id = l.contact_id
+          LEFT JOIN LATERAL (
+            SELECT id, pet_id FROM petcare_clinical_records
+            WHERE appointment_id = l.id ORDER BY created_at DESC LIMIT 1
+          ) r ON true
+          WHERE l.type = 'appointment'
+          ORDER BY l.created_at DESC
+          LIMIT 500
+        `;
+        return response({ appointments }, 200, origin);
+      }
+      if (action === "whatsapp-status" || action === "whatsapp-logout") {
+        const recent = await sql`
+          SELECT m.id, m.phone, m.body, m.status, m.error, m.sent_by_name AS "sentByName", m.created_at AS "createdAt",
+            concat_ws(' ', c.firstname, c.lastname) AS "contactName"
+          FROM petcare_whatsapp_messages m LEFT JOIN petcare_contacts c ON c.id = m.contact_id
+          ORDER BY m.created_at DESC LIMIT 30
+        `;
+        const service = whatsappService();
+        if (!service) return response({ configured: false, recent }, 200, origin);
+        try {
+          const result = await callWhatsapp(service, action === "whatsapp-logout" ? "/logout" : "/status", action === "whatsapp-logout" ? {} : undefined);
+          if (action === "whatsapp-logout") return response({ ok: true }, 200, origin);
+          return response({ configured: true, reachable: true, ...(result as object), recent }, 200, origin);
+        } catch (error) {
+          return response({
+            configured: true,
+            reachable: false,
+            error: error instanceof Error ? error.message : "El servicio de WhatsApp no responde.",
+            recent,
+          }, 200, origin);
+        }
+      }
+      if (action === "whatsapp-history") {
+        const contactId = text(body?.contactId, 36);
+        if (!UUID_PATTERN.test(contactId)) return response({ error: "Contacto inválido." }, 400, origin);
+        const messages = await sql`
+          SELECT id, body, status, error, sent_by_name AS "sentByName", created_at AS "createdAt"
+          FROM petcare_whatsapp_messages WHERE contact_id = ${contactId}::uuid
+          ORDER BY created_at DESC LIMIT 20
+        `;
+        return response({ messages }, 200, origin);
+      }
+      if (action === "whatsapp-send") {
+        const contactId = text(body?.contactId, 36);
+        const message = text(body?.message, 2000);
+        if (!UUID_PATTERN.test(contactId) || !message) return response({ error: "Escribe el mensaje antes de enviarlo." }, 400, origin);
+        const service = whatsappService();
+        if (!service) return response({ error: "WhatsApp aún no está configurado. Pide al administrador que lo conecte." }, 503, origin);
+        const contacts = await sql`SELECT phone FROM petcare_contacts WHERE id = ${contactId}::uuid`;
+        const phone = String(contacts[0]?.phone ?? "").replace(/\D/g, "");
+        if (!contacts.length) return response({ error: "No se encontró el contacto." }, 404, origin);
+        if (!/^9\d{8}$/.test(phone)) return response({ error: "El contacto no tiene un celular válido para WhatsApp." }, 422, origin);
+        const sentByName = `${activeSession.firstname} ${activeSession.lastname}`.trim() || activeSession.sub;
+        let providerId: string | null = null;
+        let failure = "";
+        try {
+          const result = await callWhatsapp(service, "/send", { phone, message }) as { id?: string | null };
+          providerId = result.id ?? null;
+        } catch (error) {
+          failure = error instanceof Error ? error.message : "No se pudo enviar el mensaje.";
+        }
+        await sql`
+          INSERT INTO petcare_whatsapp_messages (id, contact_id, phone, body, status, error, provider_id, sent_by_id, sent_by_name)
+          VALUES (${crypto.randomUUID()}::uuid, ${contactId}::uuid, ${phone}, ${message}, ${failure ? "failed" : "sent"},
+            ${failure}, ${providerId}, ${activeSession.id}, ${sentByName})
+        `;
+        if (failure) return response({ error: failure }, 502, origin);
+        return response({ ok: true }, 200, origin);
+      }
+      if (action === "clinic-owners") {
+        const owners = await sql`
+          SELECT c.id, concat_ws(' ', c.firstname, c.lastname) AS name, c.email, c.phone,
+            COALESCE(json_agg(json_build_object('id', p.id, 'name', p.name, 'species', p.species) ORDER BY p.name)
+              FILTER (WHERE p.id IS NOT NULL), '[]') AS pets
+          FROM petcare_contacts c LEFT JOIN petcare_pets p ON p.contact_id = c.id
+          GROUP BY c.id ORDER BY lower(c.firstname), lower(c.lastname) LIMIT 1000
+        `;
+        return response({ owners }, 200, origin);
+      }
+      if (action === "patients") {
+        const patients = await sql`
+          SELECT p.id, p.name, p.species, p.breed, p.sex, p.birth_date AS "birthDate",
+            p.contact_id AS "ownerId", concat_ws(' ', c.firstname, c.lastname) AS "ownerName", c.phone AS "ownerPhone",
+            count(r.id)::int AS "recordCount", max(r.visited_at) AS "lastVisitAt",
+            (SELECT min(next_visit) FROM petcare_clinical_records WHERE pet_id = p.id AND next_visit >= current_date) AS "nextVisit"
+          FROM petcare_pets p JOIN petcare_contacts c ON c.id = p.contact_id
+          LEFT JOIN petcare_clinical_records r ON r.pet_id = p.id
+          GROUP BY p.id, c.id
+          ORDER BY max(r.visited_at) DESC NULLS LAST, p.created_at DESC
+          LIMIT 1000
+        `;
+        return response({ patients }, 200, origin);
+      }
+      if (action === "patient") {
+        const id = text(body?.id, 36);
+        if (!UUID_PATTERN.test(id)) return response({ error: "Paciente inválido." }, 400, origin);
+        const [pets, records] = await Promise.all([
+          sql`
+            SELECT p.id, p.name, p.species, p.breed, p.sex, p.birth_date AS "birthDate", p.background,
+              p.contact_id AS "ownerId", concat_ws(' ', c.firstname, c.lastname) AS "ownerName",
+              c.email AS "ownerEmail", c.phone AS "ownerPhone", p.created_at AS "createdAt"
+            FROM petcare_pets p JOIN petcare_contacts c ON c.id = p.contact_id
+            WHERE p.id = ${id}::uuid
+          `,
+          sql`
+            SELECT r.id, r.appointment_id AS "appointmentId", r.veterinarian_name AS "veterinarianName",
+              r.visited_at AS "visitedAt", r.reason, r.weight_kg AS "weightKg", r.temperature_c AS "temperatureC",
+              r.diagnosis, r.treatment, r.comments, r.next_visit AS "nextVisit", l.service AS "appointmentService"
+            FROM petcare_clinical_records r LEFT JOIN petcare_leads l ON l.id = r.appointment_id
+            WHERE r.pet_id = ${id}::uuid
+            ORDER BY r.visited_at DESC
+          `,
+        ]);
+        if (!pets.length) return response({ error: "No se encontró el paciente." }, 404, origin);
+        return response({ patient: pets[0], records }, 200, origin);
+      }
+      if (action === "pet-save") {
+        const petId = text(body?.id, 36);
+        const ownerId = text(body?.ownerId, 36);
+        const name = text(body?.name, 80);
+        const species = text(body?.species, 20);
+        const sex = text(body?.sex, 20) || "desconocido";
+        const birthDate = text(body?.birthDate, 10);
+        if (
+          !name || !PET_SPECIES.includes(species) || !PET_SEXES.includes(sex) ||
+          (petId ? !UUID_PATTERN.test(petId) : !UUID_PATTERN.test(ownerId)) ||
+          (birthDate && (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || Date.parse(birthDate) > Date.now()))
+        ) {
+          return response({ error: "Revisa el nombre, la especie y la fecha de nacimiento de la mascota." }, 400, origin);
+        }
+        const values = { breed: text(body?.breed, 80), background: text(body?.background, 3000), birthDate: birthDate || null };
+        const saved = petId
+          ? await sql`
+              UPDATE petcare_pets SET name = ${name}, species = ${species}, breed = ${values.breed}, sex = ${sex},
+                birth_date = ${values.birthDate}::date, background = ${values.background}, updated_at = now()
+              WHERE id = ${petId}::uuid RETURNING id
+            `
+          : await sql`
+              INSERT INTO petcare_pets (id, contact_id, name, species, breed, sex, birth_date, background)
+              SELECT ${crypto.randomUUID()}::uuid, id, ${name}, ${species}, ${values.breed}, ${sex}, ${values.birthDate}::date, ${values.background}
+              FROM petcare_contacts WHERE id = ${ownerId}::uuid
+              RETURNING id
+            `;
+        if (!saved.length) return response({ error: petId ? "No se encontró el paciente." : "No se encontró el dueño." }, 404, origin);
+        return response({ id: String(saved[0].id) }, petId ? 200 : 201, origin);
+      }
+      if (action === "clinical-record") {
+        const petId = text(body?.petId, 36);
+        const appointmentId = text(body?.appointmentId, 36);
+        const reason = text(body?.reason, 300);
+        const number = (value: unknown, min: number, max: number) =>
+          typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : null;
+        const weight = body?.weightKg === undefined || body?.weightKg === null ? null : number(body.weightKg, 0.01, 999);
+        const temperature = body?.temperatureC === undefined || body?.temperatureC === null ? null : number(body.temperatureC, 30, 45);
+        const visitedAt = text(body?.visitedAt, 40);
+        const nextVisit = text(body?.nextVisit, 10);
+        if (
+          !UUID_PATTERN.test(petId) || (appointmentId && !UUID_PATTERN.test(appointmentId)) || !reason ||
+          (body?.weightKg != null && weight === null) || (body?.temperatureC != null && temperature === null) ||
+          (visitedAt && (!Number.isFinite(Date.parse(visitedAt)) || Date.parse(visitedAt) > Date.now() + 60_000)) ||
+          (nextVisit && !/^\d{4}-\d{2}-\d{2}$/.test(nextVisit))
+        ) {
+          return response({ error: "Revisa el motivo, el peso (kg), la temperatura (°C) y las fechas de la atención." }, 400, origin);
+        }
+        const recordId = crypto.randomUUID();
+        const veterinarianName = `${activeSession.firstname} ${activeSession.lastname}`.trim() || activeSession.sub;
+        const inserted = await sql`
+          INSERT INTO petcare_clinical_records (
+            id, pet_id, appointment_id, veterinarian_id, veterinarian_name, visited_at, reason,
+            weight_kg, temperature_c, diagnosis, treatment, comments, next_visit
+          )
+          SELECT ${recordId}::uuid, p.id, ${appointmentId || null}::uuid, ${activeSession.id}, ${veterinarianName},
+            ${visitedAt ? new Date(visitedAt).toISOString() : new Date().toISOString()}, ${reason},
+            ${weight}, ${temperature}, ${text(body?.diagnosis, 3000)}, ${text(body?.treatment, 3000)},
+            ${text(body?.comments, 5000)}, ${nextVisit || null}::date
+          FROM petcare_pets p
+          WHERE p.id = ${petId}::uuid AND (
+            ${appointmentId || null}::uuid IS NULL OR EXISTS (
+              SELECT 1 FROM petcare_leads l
+              WHERE l.id = ${appointmentId || null}::uuid AND l.type = 'appointment' AND l.contact_id = p.contact_id
+            )
+          )
+          RETURNING id
+        `;
+        if (!inserted.length) return response({ error: "La mascota no corresponde al dueño de esta cita." }, 404, origin);
+        if (appointmentId) {
+          await sql`UPDATE petcare_leads SET status = 'closed' WHERE id = ${appointmentId}::uuid AND type = 'appointment'`;
+        }
+        return response({ id: recordId }, 201, origin);
+      }
+      if (action === "appointment-status") {
+        const id = text(body?.id, 64);
+        const status = text(body?.status, 24);
+        if (!id || !["new", "contacted", "qualified", "closed"].includes(status)) return response({ error: "Estado de cita inválido." }, 400, origin);
+        const updated = await sql`
+          UPDATE petcare_leads SET status = ${status}
+          WHERE id = ${id}::uuid AND type = 'appointment'
+          RETURNING id
+        `;
+        if (!updated.length) return response({ error: "No se encontró la cita." }, 404, origin);
         return response({ ok: true }, 200, origin);
       }
       if (action === "read") {
@@ -1231,7 +1555,7 @@ export default {
         const allowed = ["visitante", "lead", "interesado", "cliente", "cliente_recurrente", "cliente_fidelizado"];
         if (!id || !allowed.includes(lifecycle)) return response({ error: "Etapa de contacto inválida." }, 400, origin);
         await sql`UPDATE petcare_contacts SET lifecycle = ${lifecycle}, lifecycle_updated_at = now(),
-          lifecycle_reason = 'Etapa actualizada por el administrador' WHERE id = ${id}::uuid`;
+          lifecycle_reason = ${`Etapa actualizada por ${activeSession.firstname || "el equipo"}`} WHERE id = ${id}::uuid`;
         return response({ ok: true }, 200, origin);
       }
       if (action === "contact-notes") {

@@ -17,11 +17,7 @@ import { ConsentFields, Field, inputClass, validateContact, type ContactErrors }
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { createCustomerOrder } from "@/lib/adminAuth";
-import { hubspot, submitHubSpotForm } from "@/lib/hubspot";
 import { formatPrice, whatsappLink } from "@/lib/utils";
-
-// Con el formulario de pedidos configurado, se piden los datos del cliente antes de ir a WhatsApp
-const crmEnabled = Boolean(hubspot.portalId && hubspot.orderFormId);
 
 type Step = "cart" | "checkout" | "sending" | "done";
 
@@ -105,27 +101,6 @@ export function CartDrawer() {
       });
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : "No pudimos guardar tu pedido.");
-      setStep("checkout");
-      return;
-    }
-
-    const result = crmEnabled
-      ? await submitHubSpotForm(
-          hubspot.orderFormId,
-          {
-            firstname: get("firstname"),
-            lastname: get("lastname"),
-            email: get("email"),
-            phone: get("phone").replace(/\D/g, ""),
-            detalle_pedido: orderLines.join("\n"),
-            monto_pedido: total.toFixed(2),
-          },
-          { marketing: data.get("marketing") === "on" },
-        )
-      : { status: "skipped" as const };
-
-    if (result.status === "error") {
-      setSubmitError(result.message);
       setStep("checkout");
       return;
     }

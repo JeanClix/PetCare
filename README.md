@@ -21,8 +21,6 @@ Cada push a `main` compila y publica la web con `.github/workflows/deploy.yml`.
 2. Haz push a `main`. El avance se ve en la pestaña *Actions*.
 3. La web queda en `https://jeanclix.github.io/PetCare/`.
 
-La configuración de HubSpot para la versión publicada está en `.env.production` (IDs públicos, versionados en el repo).
-
 ## Páginas
 
 | Ruta          | Contenido                                                                 |
@@ -35,23 +33,28 @@ La configuración de HubSpot para la versión publicada está en `.env.productio
 
 El carrito se guarda en el navegador y **el pedido se finaliza por WhatsApp** con el detalle ya escrito. Cualquier otra ruta muestra una página 404.
 
-### HubSpot (CRM)
+### CRM en Neon
 
-La integración ya está programada en `src/lib/hubspot.ts` y se configura en `.env.production`. El código de seguimiento ya está activo (Hub ID `52059776`):
+Todo el CRM vive en PostgreSQL de Neon (no se usa HubSpot ni otro CRM externo de pago): cuentas, contactos, solicitudes de cita, pedidos, mensajes y campañas de email. El formulario de citas y el checkout guardan sus datos con la función `functions/admin` y luego se coordina por WhatsApp.
 
-- Seguimiento de visitas y fuentes, incluida la navegación interna de la web.
-- Formulario de citas enviado a HubSpot con datos del dueño y de la mascota, consentimiento (Ley N.° 29733) y agenda de Meetings al terminar.
-- Pedidos de la tienda registrados en HubSpot (detalle y monto) antes de coordinar por WhatsApp.
+### WhatsApp
 
-Sin configurar, todo funciona con WhatsApp como respaldo. Qué sacar de HubSpot y cómo: **[docs/hubspot.md](docs/hubspot.md)**. Los 54 productos para importar están en `docs/hubspot-productos.csv`.
+El equipo escribe a los clientes desde el panel con el WhatsApp de la clínica (plantillas para coordinar citas, recordar controles y avisar pedidos). Usa `services/whatsapp`, un servicio con [Baileys](https://github.com/WhiskeySockets/Baileys) desplegado en Render (`render.yaml`), sin la API de Meta. Guía: **[docs/whatsapp.md](docs/whatsapp.md)**.
 
-### Panel administrativo
+### Roles y panel interno
 
-El panel está en `/#/admin`. Para probar el acceso local usa `admin` / `admin`; esas credenciales solo existen en Vite y no habilitan el CRM persistente. Contactos, mensajes y leads nuevos se guardan en PostgreSQL de Neon cuando la función backend está desplegada y `VITE_ADMIN_API_URL` está configurada. La guía **[docs/admin.md](docs/admin.md)** incluye despliegue y migración de los leads locales del navegador. Las etapas de cliente se actualizan manualmente hasta conectar una fuente confiable de compras pagadas.
+| Rol             | Acceso                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| `customer`      | Cliente: crea su cuenta desde `/#/cuenta` y finaliza pedidos de la tienda.                   |
+| `admin`         | Administrador: todo el panel, incluida la sección **Cuentas y roles** y limpiar el CRM.       |
+| `sales`         | Ventas: dashboard, pedidos, contactos, mensajes, citas, email marketing y analítica.          |
+| `veterinarian`  | Veterinario: solo la sección **Citas**, donde ve y actualiza el estado de cada solicitud.     |
+
+El panel está en `/#/admin`, con su propio layout (sidebar por secciones, sin el header público). Cada rol ve solo sus secciones y el backend vuelve a validar el permiso en cada solicitud. Para probar el acceso local usa `admin` / `admin`; esas credenciales solo existen en Vite y no habilitan el CRM persistente. Contactos, mensajes y leads nuevos se guardan en PostgreSQL de Neon cuando la función backend está desplegada y `VITE_ADMIN_API_URL` está configurada. La guía **[docs/admin.md](docs/admin.md)** incluye despliegue y migración de los leads locales del navegador. Las etapas de cliente se actualizan manualmente hasta conectar una fuente confiable de compras pagadas.
 
 El estado del funnel, la agenda y los módulos pendientes de email marketing están documentados en **[MARKETING_PETCARE.md](MARKETING_PETCARE.md)**.
 
-Los clientes crean una cuenta o inician sesión desde `/#/cuenta`. El correo administrativo se autentica en la misma pantalla y abre el CRM; las cuentas de cliente no tienen acceso administrativo. El administrador puede asignar el rol veterinario a cuentas existentes desde “Cuentas y roles”; el registro público siempre crea cuentas de cliente. El portal `/#/veterinario` solo confirma el acceso de la cuenta y no incluye herramientas clínicas. Para finalizar un pedido hay que iniciar sesión con una cuenta de cliente; el carrito se conserva mientras el visitante se autentica y el pedido queda vinculado al contacto del CRM.
+Todos inician sesión desde `/#/cuenta` (botón **Ingresar** del header); el equipo interno es redirigido al panel. El registro público siempre crea cuentas de cliente y el administrador asigna los demás roles desde “Cuentas y roles”. Para finalizar un pedido hay que iniciar sesión con una cuenta de cliente; el carrito se conserva mientras el visitante se autentica y el pedido queda vinculado al contacto del CRM.
 
 ## Paleta (extraída del logo)
 

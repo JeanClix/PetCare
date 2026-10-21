@@ -1,0 +1,21 @@
+# Blueprint de Render para el servicio de WhatsApp (Dashboard → New → Blueprint → este repositorio).
+# La sesión de WhatsApp se guarda en Neon, así que el disco efímero del plan gratis no la pierde.
+services:
+  - type: web
+    name: petcare-whatsapp
+    runtime: node
+    plan: free
+    rootDir: services/whatsapp
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # Cadena de conexión de Neon (proyecto petcare, rama main). Se pega a mano en Render.
+      - key: DATABASE_URL
+        sync: false
+      # Debe ser el mismo valor configurado en la función admin de Neon.
+      - key: WHATSAPP_SERVICE_TOKEN
+        sync: false

@@ -6,7 +6,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { isDevelopmentAdminAuth } from "@/lib/adminAuth";
+import { isDevelopmentAdminAuth, isStaffRole } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
 
 type Mode = "login" | "register";
@@ -26,10 +26,8 @@ export function Account() {
 
   useEffect(() => {
     if (!ready || !user) return;
-    if (user.role === "admin") {
+    if (isStaffRole(user.role)) {
       navigate("/admin", { replace: true });
-    } else if (user.role === "veterinarian") {
-      navigate("/veterinario", { replace: true });
     } else if (next === "/checkout") {
       navigate("/tienda", { replace: true, state: { checkoutAfterLogin: true } });
       openCart();
@@ -89,97 +87,101 @@ export function Account() {
   }
 
   return (
-    <>
-      <PageHeader
-        title={mode === "login" ? "Inicia sesión" : "Crea tu cuenta"}
-        description={mode === "login"
-          ? "Accede a tu cuenta de PetCare. El administrador entra aquí con su correo y contraseña habituales."
-          : "Regístrate para hacer pedidos y consultar tu cuenta de cliente."}
-      />
-      <Container className="py-14 sm:py-20">
-        <section className="mx-auto max-w-md space-y-6 rounded-media border border-border bg-card p-6 shadow-soft sm:p-8">
-          <div className="flex rounded-full bg-muted p-1" role="tablist" aria-label="Acceso a PetCare">
-            {(["login", "register"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                role="tab"
-                aria-selected={mode === option}
-                disabled={option === "register" && isDevelopmentAdminAuth}
-                onClick={() => { setMode(option); setError(""); }}
-                className={cn(
-                  "flex-1 rounded-full px-3 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                  mode === option ? "bg-card text-primary shadow-soft" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {option === "login" ? "Iniciar sesión" : "Registrarme"}
-              </button>
-            ))}
-          </div>
+    <Container className="py-10 sm:py-14">
+      <section className="mx-auto max-w-md space-y-5 rounded-media border border-border bg-card p-6 shadow-soft sm:p-8">
+        <div>
+          <h1 className="text-2xl font-black text-primary sm:text-3xl">
+            {mode === "login" ? "Inicia sesión" : "Crea tu cuenta"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {mode === "login" ? "Entra para hacer pedidos y ver tu cuenta." : "Regístrate para hacer pedidos en la tienda."}
+          </p>
+        </div>
+        <div className="flex rounded-full bg-muted p-1" role="tablist" aria-label="Acceso a PetCare">
+          {(["login", "register"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="tab"
+              aria-selected={mode === option}
+              disabled={option === "register" && isDevelopmentAdminAuth}
+              onClick={() => { setMode(option); setError(""); }}
+              className={cn(
+                "flex-1 rounded-full px-3 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                mode === option ? "bg-card text-primary shadow-soft" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option === "login" ? "Iniciar sesión" : "Registrarme"}
+            </button>
+          ))}
+        </div>
 
-          {isDevelopmentAdminAuth && (
-            <p className="rounded-xl bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
-              En modo local solo está habilitado el acceso de demostración del administrador. El registro de clientes requiere Neon.
-            </p>
+        {isDevelopmentAdminAuth && (
+          <p className="rounded-xl bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
+            En modo local solo está habilitado el acceso de demostración del administrador. El registro de clientes requiere Neon.
+          </p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {mode === "register" && (
+            <div className="space-y-2">
+              <label htmlFor="account-name" className="block text-sm font-bold">Nombre completo</label>
+              <input
+                id="account-name"
+                name="name"
+                autoComplete="name"
+                required
+                minLength={2}
+                maxLength={120}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 focus:border-accent focus:outline-none"
+              />
+            </div>
           )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {mode === "register" && (
-              <div className="space-y-2">
-                <label htmlFor="account-name" className="block text-sm font-bold">Nombre completo</label>
-                <input
-                  id="account-name"
-                  name="name"
-                  autoComplete="name"
-                  required
-                  minLength={2}
-                  maxLength={120}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 focus:border-accent focus:outline-none"
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <label htmlFor="account-email" className="block text-sm font-bold">
-                {isDevelopmentAdminAuth ? "Usuario" : "Correo electrónico"}
-              </label>
-              <input
-                id="account-email"
-                name="email"
-                type={isDevelopmentAdminAuth ? "text" : "email"}
-                autoComplete="username"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder={isDevelopmentAdminAuth ? "admin" : "tu@correo.com"}
-                className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 focus:border-accent focus:outline-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="account-password" className="block text-sm font-bold">Contraseña</label>
-              <input
-                id="account-password"
-                name="password"
-                type="password"
-                autoComplete={mode === "register" ? "new-password" : "current-password"}
-                required
-                minLength={mode === "register" ? 12 : undefined}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 focus:border-accent focus:outline-none"
-              />
-              {mode === "register" && <p className="text-xs text-muted-foreground">Usa al menos 12 caracteres.</p>}
-            </div>
-            {error && <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">{error}</p>}
-            <Button type="submit" size="lg" className="w-full" disabled={submitting || (isDevelopmentAdminAuth && mode === "register")}>
-              {submitting ? "Un momento..." : mode === "login" ? <><SignIn weight="bold" /> Iniciar sesión</> : <><LockKey weight="bold" /> Crear cuenta</>}
-            </Button>
-            {next === "/checkout" && <p className="text-center text-sm text-muted-foreground">Al iniciar sesión volverás al carrito para finalizar tu pedido.</p>}
-          </form>
-
-        </section>
-      </Container>
-    </>
+          <div className="space-y-2">
+            <label htmlFor="account-email" className="block text-sm font-bold">
+              {isDevelopmentAdminAuth ? "Usuario" : "Correo electrónico"}
+            </label>
+            <input
+              id="account-email"
+              name="email"
+              type={isDevelopmentAdminAuth ? "text" : "email"}
+              autoComplete="username"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder={isDevelopmentAdminAuth ? "admin" : "tu@correo.com"}
+              className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="account-password" className="block text-sm font-bold">Contraseña</label>
+            <input
+              id="account-password"
+              name="password"
+              type="password"
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
+              required
+              minLength={mode === "register" ? 12 : undefined}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 focus:border-accent focus:outline-none"
+            />
+            {mode === "register" && <p className="text-xs text-muted-foreground">Usa al menos 12 caracteres.</p>}
+          </div>
+          {error && <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">{error}</p>}
+          <Button type="submit" size="lg" className="w-full" disabled={submitting || (isDevelopmentAdminAuth && mode === "register")}>
+            {submitting ? "Un momento..." : mode === "login" ? <><SignIn weight="bold" /> Iniciar sesión</> : <><LockKey weight="bold" /> Crear cuenta</>}
+          </Button>
+          {next === "/checkout" && <p className="text-center text-sm text-muted-foreground">Al iniciar sesión volverás al carrito para finalizar tu pedido.</p>}
+        </form>
+        {mode === "login" && (
+          <p className="border-t border-border pt-4 text-center text-xs text-muted-foreground">
+            ¿Eres del equipo PetCare? Entra con tu correo de trabajo.
+          </p>
+        )}
+      </section>
+    </Container>
   );
 }

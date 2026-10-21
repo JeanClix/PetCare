@@ -47,6 +47,7 @@
 
   --animate-fade-up: fade-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-slide-in-right: slide-in-right 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-slide-in-left: slide-in-left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-marquee: marquee 40s linear infinite;
 
   @keyframes fade-up {
@@ -62,6 +63,14 @@
   @keyframes marquee {
     to {
       transform: translateX(-50%);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
     }
   }
   @keyframes slide-in-right {
@@ -153,12 +162,5 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
-  }
-}
-
-/* Con el asistente abierto en pantallas chicas, se oculta el chat de HubSpot para que no lo tape */
-@media (max-width: 639px) {
-  body.assistant-open #hubspot-messages-iframe-container {
-    display: none !important;
   }
 }

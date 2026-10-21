@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
+  accountRoles,
   getManagedAccounts,
+  roleLabels,
   setManagedAccountRole,
+  type AccountRole,
   type ManagedAccount,
 } from "@/lib/adminAuth";
+import { cn } from "@/lib/utils";
 
-export function AdminAccounts({ token }: { token: string }) {
+const roleDescriptions: Record<AccountRole, string> = {
+  customer: "Compra en la tienda y gestiona su cuenta.",
+  admin: "Acceso completo al panel, incluidas cuentas y roles.",
+  veterinarian: "Ve y actualiza las citas de los clientes.",
+  sales: "Pedidos, contactos, mensajes y email marketing.",
+};
+
+export function AdminAccounts({ token, currentEmail }: { token: string; currentEmail: string }) {
+  const [roleFilter, setRoleFilter] = useState<AccountRole | "all">("all");
   const [accounts, setAccounts] = useState<ManagedAccount[]>([]);
   const [drafts, setDrafts] = useState<Record<string, ManagedAccount["role"]>>({});
   const [loading, setLoading] = useState(true);
@@ -35,6 +47,7 @@ export function AdminAccounts({ token }: { token: string }) {
   async function saveRole(account: ManagedAccount) {
     const role = drafts[account.id] ?? account.role;
     if (role === account.role) return;
+    if (role === "admin" && !window.confirm(`¿Dar acceso completo de administrador a ${account.email}?`)) return;
     setSavingId(account.id);
     setError("");
     setMessage("");
@@ -49,23 +62,44 @@ export function AdminAccounts({ token }: { token: string }) {
     }
   }
 
+  const visibleAccounts = accounts.filter((account) => roleFilter === "all" || account.role === roleFilter);
+
   return (
-    <section className="space-y-5" aria-labelledby="account-roles-heading">
-      <div>
-        <h2 id="account-roles-heading" className="font-display text-2xl font-black text-primary">Cuentas y roles</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Solo el administrador puede otorgar o retirar el rol veterinario. El registro público siempre crea cuentas de cliente.
-        </p>
+    <section className="space-y-5" aria-label="Cuentas y roles">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {accountRoles.map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={roleFilter === option}
+            onClick={() => setRoleFilter((current) => (current === option ? "all" : option))}
+            className={cn(
+              "rounded-card border bg-card p-4 text-left transition-colors",
+              roleFilter === option ? "border-accent ring-2 ring-accent/20" : "border-border hover:border-accent/60",
+            )}
+          >
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="font-display font-black text-primary">{roleLabels[option]}</span>
+              <span className="font-display text-2xl font-black text-primary tabular-nums">
+                {loading ? "–" : accounts.filter((account) => account.role === option).length}
+              </span>
+            </span>
+            <span className="mt-1 block text-xs text-muted-foreground">{roleDescriptions[option]}</span>
+          </button>
+        ))}
       </div>
+      <p className="text-sm text-muted-foreground">
+        El registro público siempre crea cuentas de cliente. Desde aquí asignas los roles internos; los cambios cierran la sesión activa de esa cuenta.
+      </p>
       {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</p>}
       {message && <p role="status" className="rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">{message}</p>}
       {loading ? (
         <div role="status" className="rounded-media border border-border bg-card px-6 py-16 text-center text-muted-foreground">
           Cargando cuentas...
         </div>
-      ) : accounts.length === 0 ? (
+      ) : visibleAccounts.length === 0 ? (
         <div className="rounded-media border border-border bg-card px-6 py-12 text-center text-muted-foreground">
-          Todavía no hay cuentas registradas.
+          {accounts.length === 0 ? "Todavía no hay cuentas registradas." : "No hay cuentas con este rol."}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-media border border-border bg-card shadow-soft">
@@ -79,8 +113,9 @@ export function AdminAccounts({ token }: { token: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {accounts.map((account) => {
+              {visibleAccounts.map((account) => {
                 const role = drafts[account.id] ?? account.role;
+                const isSelf = account.email === currentEmail;
                 return (
                   <tr key={account.id}>
                     <td className="px-4 py-4">
@@ -99,10 +134,11 @@ export function AdminAccounts({ token }: { token: string }) {
                           ...current,
                           [account.id]: event.target.value as ManagedAccount["role"],
                         }))}
-                        className="h-10 rounded-xl border border-border bg-background px-3"
+                        disabled={isSelf}
+                        title={isSelf ? "No puedes cambiar el rol de tu propia cuenta" : undefined}
+                        className="h-10 rounded-xl border border-border bg-background px-3 disabled:opacity-60"
                       >
-                        <option value="customer">Cliente</option>
-                        <option value="veterinarian">Veterinario</option>
+                        {accountRoles.map((option) => <option key={option} value={option}>{roleLabels[option]}</option>)}
                       </select>
                     </td>
                     <td className="px-4 py-4 text-right">
