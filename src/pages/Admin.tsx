@@ -9,12 +9,14 @@ import {
   FirstAidKit,
   Gauge,
   Lightbulb,
+  ShareNetwork,
   UserGear,
   Users,
   WhatsappLogo,
 } from "@phosphor-icons/react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { StaffShell, type StaffNavSection } from "@/components/staff/StaffShell";
+import { SocialMediaManager } from "@/components/staff/SocialMediaManager";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { useAuth, type AuthUser } from "@/context/AuthContext";
@@ -54,7 +56,7 @@ const statusLabels: Record<CrmLeadStatus, string> = {
   closed: "Cerrado",
 };
 
-type AdminView = "dashboard" | "leads" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "patients" | "whatsapp";
+type AdminView = "dashboard" | "leads" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "patients" | "whatsapp" | "social";
 
 const adminViews: Record<AdminView, { label: string; description: string; icon: typeof Gauge; roles: StaffRole[] }> = {
   dashboard: { label: "Dashboard", description: "Resumen de solicitudes, contactos y mensajes guardados en Neon.", icon: Gauge, roles: ["admin", "sales"] },
@@ -67,6 +69,7 @@ const adminViews: Record<AdminView, { label: string; description: string; icon: 
   appointments: { label: "Citas", description: "Solicitudes de cita de los clientes y su estado de atención.", icon: CalendarCheck, roles: ["admin", "sales", "veterinarian"] },
   patients: { label: "Pacientes", description: "Historial clínico de cada mascota: datos, antecedentes y atenciones.", icon: FirstAidKit, roles: ["admin", "veterinarian"] },
   whatsapp: { label: "WhatsApp", description: "Número de la clínica enlazado y mensajes enviados desde el panel.", icon: WhatsappLogo, roles: ["admin"] },
+  social: { label: "Redes Sociales", description: "Conecta Facebook e Instagram y publica contenido desde PetCare.", icon: ShareNetwork, roles: ["admin"] },
   accounts: { label: "Cuentas y roles", description: "Asigna los roles cliente, administrador, veterinario o ventas.", icon: UserGear, roles: ["admin"] },
 };
 
@@ -74,7 +77,7 @@ const adminSections: Array<{ label: string; views: AdminView[] }> = [
   { label: "General", views: ["dashboard"] },
   { label: "Ventas", views: ["leads", "contacts", "messages"] },
   { label: "Clínica", views: ["appointments", "patients"] },
-  { label: "Marketing", views: ["marketing", "analytics", "recommendations"] },
+  { label: "Marketing", views: ["marketing", "social", "analytics", "recommendations"] },
   { label: "Administración", views: ["accounts", "whatsapp"] },
 ];
 
@@ -125,6 +128,7 @@ export function Admin() {
 }
 
 function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUser & { role: StaffRole } }) {
+  const location = useLocation();
   const { token, role } = user;
   const canReadCrm = role === "admin" || role === "sales";
   const isAdmin = role === "admin";
@@ -163,6 +167,12 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [contactNotesDraft, setContactNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+
+  const socialOAuthState = new URLSearchParams(location.search).get("state") ?? "";
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("view") === "social") setActiveView("social");
+  }, [location.search]);
 
   async function refreshCrm(showLoading = true) {
     if (!canReadCrm) return;
@@ -292,7 +302,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
         description={current.description}
         user={user}
         onLogout={onLogout}
-        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "whatsapp" && (
+        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "whatsapp" && activeView !== "social" && (
           <Button
             variant="outline"
             size="sm"
@@ -327,6 +337,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
           />
         )}
         {activeView === "whatsapp" && <WhatsappSettings token={token} />}
+        {activeView === "social" && <SocialMediaManager token={token} oauthState={socialOAuthState} />}
         {activeView === "patients" && <PatientsView token={token} selectedId={selectedPatientId} onSelect={setSelectedPatientId} />}
 
         {activeView === "accounts" && <AdminAccounts token={token} currentEmail={user.email} />}
