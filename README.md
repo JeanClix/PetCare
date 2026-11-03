@@ -41,6 +41,10 @@ Todo el CRM vive en PostgreSQL de Neon (no se usa HubSpot ni otro CRM externo de
 
 El equipo escribe a los clientes desde el panel con el WhatsApp de la clínica (plantillas para coordinar citas, recordar controles y avisar pedidos). Usa `services/whatsapp`, un servicio con [Baileys](https://github.com/WhiskeySockets/Baileys) desplegado en Render (`render.yaml`), sin la API de Meta. Guía: **[docs/whatsapp.md](docs/whatsapp.md)**.
 
+### Redes sociales
+
+El administrador conecta la página de Facebook de Gabus Vet y su cuenta profesional de Instagram vinculada desde **Marketing → Redes Sociales**. Puede redactar publicaciones, adjuntar una imagen JPEG, previsualizar y publicar mediante la API oficial de Meta; los intentos y resultados quedan en Neon. Requiere una app de Meta configurada en la función admin. Guía: **[docs/redes-sociales.md](docs/redes-sociales.md)**.
+
 ### Roles y panel interno
 
 | Rol             | Acceso                                                                                      |
