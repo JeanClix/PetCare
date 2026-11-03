@@ -4,7 +4,7 @@ La sección **Marketing → Redes Sociales** del panel publica imágenes directa
 
 ## Requisitos de Meta
 
-- Una página de Facebook de Gabus Vet.
+- Una página de Facebook de PetCare.
 - Una cuenta profesional de Instagram (empresa o creador) vinculada a esa página.
 - Una app en [Meta for Developers](https://developers.facebook.com/) con inicio de sesión de Facebook habilitado.
 - La cuenta de Meta que autoriza la app debe tener permisos para administrar la página y la cuenta de Instagram.
