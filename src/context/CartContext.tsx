@@ -13,7 +13,7 @@ interface CartContextValue {
   isOpen: boolean;
   open: () => void;
   close: () => void;
-  add: (product: Product) => void;
+  add: (product: Product, qty?: number) => void;
   setQty: (id: number, qty: number) => void;
   remove: (id: number) => void;
   clear: () => void;
@@ -53,8 +53,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       isOpen,
       open: () => setIsOpen(true),
       close: () => setIsOpen(false),
-      add: (product) => {
-        setItems((prev) => ({ ...prev, [product.id]: (prev[product.id] ?? 0) + 1 }));
+      add: (product, qty = 1) => {
+        const quantity = Math.max(1, Math.floor(qty));
+        setItems((prev) => ({ ...prev, [product.id]: (prev[product.id] ?? 0) + quantity }));
         setIsOpen(true);
       },
       setQty: (id, qty) =>
