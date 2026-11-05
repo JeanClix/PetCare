@@ -158,12 +158,8 @@ export const photos = {
   corgi: unsplash("1537151608828-ea2b11777ee8", 800),
   aussie: unsplash("1587300003388-59208cc962cb", 1000),
   friends: unsplash("1450778869180-41d0601e046e", 1000),
-  travel: asset("/img/services/pet-travel.jpg"),
-};
-
-export const travelPhotoCredit = {
-  label: "Foto: Jennifer Jacquemart / Comisión Europea · CC BY 4.0",
-  url: "https://commons.wikimedia.org/wiki/File:European_pet_passport_(P-063737-00-13).jpg",
+  // Pexels photo 40329228; attribution is not required under the Pexels license.
+  travel: asset("/img/services/pet-travel-pexels.jpg"),
 };
 
 // Logos descargados de petcareperu.com/marcas

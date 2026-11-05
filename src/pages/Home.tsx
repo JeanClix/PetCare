@@ -16,7 +16,7 @@ import { ButtonLink, TextLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { products } from "@/data/products";
-import { brands, business, photos, services, testimonials, travelPhotoCredit, yearsOfExperience } from "@/data/site";
+import { brands, business, photos, services, testimonials, yearsOfExperience } from "@/data/site";
 import { cn } from "@/lib/utils";
 
 const byId = (id: string) => services.find((s) => s.id === id)!;
@@ -192,19 +192,19 @@ function TravelFeature() {
     <section className="pb-14 sm:pb-16">
       <Container>
         <div className="reveal grid overflow-hidden rounded-media bg-brand-navy text-white lg:grid-cols-[1fr_0.85fr]">
-          <div className="p-8 sm:p-12">
-            <p className="font-display text-base font-extrabold text-[#6fe0c4] italic">Trámites de viaje y microchip</p>
-            <h2 className="mt-3 text-3xl leading-[1.08] font-black sm:text-4xl">¿Viajas con tu mascota? Nosotros vemos los papeles.</h2>
-            <p className="mt-4 max-w-[52ch] text-lg text-white/80">{travel.description}</p>
-            <ul className="mt-6 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <div className="p-6 sm:p-8">
+            <p className="font-display text-sm font-extrabold text-[#6fe0c4] italic">Trámites de viaje y microchip</p>
+            <h2 className="mt-2 text-2xl leading-[1.08] font-black sm:text-3xl">¿Viajas con tu mascota? Nosotros vemos los papeles.</h2>
+            <p className="mt-3 max-w-[52ch] text-base text-white/80">{travel.description}</p>
+            <ul className="mt-4 grid gap-x-5 gap-y-2 sm:grid-cols-2">
               {travel.bullets!.map((b) => (
-                <li key={b} className="flex gap-2.5 text-[0.95rem]">
+                <li key={b} className="flex gap-2 text-sm">
                   <Check weight="bold" className="mt-0.5 size-5 shrink-0 text-[#6fe0c4]" />
                   {b}
                 </li>
               ))}
             </ul>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <ButtonLink to="/servicios#viajes" variant="light">
                 <AirplaneTilt weight="duotone" /> Planificar viaje
               </ButtonLink>
@@ -213,18 +213,13 @@ function TravelFeature() {
               </ButtonLink>
             </div>
           </div>
-          <figure className="relative h-72 overflow-hidden bg-white lg:h-full">
+          <div className="h-64 overflow-hidden bg-white sm:h-72 lg:h-96">
             <img
               src={photos.travel}
-              alt="Perro junto a su pasaporte y maletas para viajar"
+              alt="Perro viajando dentro de una maleta con su dueño"
               className="size-full object-cover object-[58%_center]"
             />
-            <figcaption className="absolute right-2 bottom-2 rounded-md bg-white/90 px-2 py-1 text-[0.65rem] text-muted-foreground shadow-sm">
-              <a href={travelPhotoCredit.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-                {travelPhotoCredit.label}
-              </a>
-            </figcaption>
-          </figure>
+          </div>
         </div>
       </Container>
     </section>
