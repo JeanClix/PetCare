@@ -29,9 +29,12 @@ const seoMetaByPath: Record<string, { title: string; description: string }> = {
       "Conoce a PetCare, una clínica veterinaria en Surco con más de 11 años de experiencia cuidando mascotas.",
   },
   "/contacto": {
+    title: "Contacto | Clínica veterinaria PetCare en Surco",
+    description: "Comunícate con PetCare para consultas sobre servicios, atención y productos veterinarios.",
+  },
+  "/citas": {
     title: "Agenda tu cita en PetCare | Clínica veterinaria en Surco",
-    description:
-      "Agenda una cita veterinaria en Surco, Lima. Consultas, grooming, cirugías, vacunas, microchip y atención a domicilio.",
+    description: "Elige un horario disponible para tu consulta veterinaria en Surco y sigue la confirmación desde tu cuenta.",
   },
   "/cuenta": {
     title: "Mi cuenta | PetCare",
@@ -54,7 +57,10 @@ function ScrollManager() {
   const { pathname, hash } = useLocation();
 
   useEffect(() => {
-    const current = seoMetaByPath[pathname] ?? seoMetaByPath["/"];
+    const isProduct = /^\/tienda\/\d+$/.test(pathname);
+    const current = isProduct
+      ? { title: "Detalle del producto | Tienda PetCare", description: "Detalles, precio y compra de productos veterinarios en PetCare." }
+      : seoMetaByPath[pathname] ?? seoMetaByPath["/"];
     document.title = current.title;
     setMeta("description", current.description);
     setMeta("og:title", current.title, "property");

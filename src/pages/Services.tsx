@@ -1,11 +1,11 @@
 import { AirplaneTilt, Check, ClipboardText, Cpu, Syringe } from "@phosphor-icons/react";
-import { Link } from "react-router-dom";
 import { ServiceIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { products } from "@/data/products";
 import { photos, services, type Service } from "@/data/site";
 import { cn } from "@/lib/utils";
 import { VisitUs } from "@/pages/Home";
@@ -20,6 +20,7 @@ const travelSteps = [
 // Los servicios con lista de detalle ocupan el ancho completo; el resto va en dos columnas
 const featured = services.filter((s) => s.bullets);
 const regular = services.filter((s) => !s.bullets);
+const travelCarrier = products.find((product) => product.id === 2355);
 
 export function Services() {
   return (
@@ -27,23 +28,10 @@ export function Services() {
       <PageHeader
         title="Servicios veterinarios en Surco"
         description="Atención médica, grooming y más para perros, gatos y mascotas exóticas."
-        image={{ src: photos.puppy, alt: "Cachorro golden en el pasto" }}
-      >
-        <nav className="mt-7 flex flex-wrap gap-2" aria-label="Servicios">
-          {services.map((s) => (
-            <Link
-              key={s.id}
-              to={`/servicios#${s.id}`}
-              className="rounded-full bg-card px-3.5 py-1.5 text-sm font-semibold shadow-soft transition-colors hover:text-accent"
-            >
-              {s.name}
-            </Link>
-          ))}
-        </nav>
-      </PageHeader>
+      />
 
       <Container className="space-y-5 py-10 sm:py-14">
-        <FeaturedService service={featured[0]} image={photos.puppy} imageAlt="Cachorro golden corriendo en el pasto" />
+        <FeaturedService service={featured[0]} image={photos.frenchie} imageAlt="Bulldog francés, paciente de la clínica" />
 
         <div className="grid gap-5 md:grid-cols-2">
           {regular.map((s, i) => (
@@ -60,15 +48,20 @@ export function Services() {
                 {s.highlight && <Badge>{s.highlight}</Badge>}
               </div>
               <h2 className="mt-4 text-2xl font-black">{s.name}</h2>
-              <p className="mt-2 max-w-[56ch] text-muted-foreground">{s.description}</p>
-              <ButtonLink to={`/contacto?servicio=${s.id}`} variant="outline" size="sm" className="mt-6">
+              <p className="mt-2 max-w-[56ch] text-muted-foreground">{s.summary}</p>
+              <ButtonLink to={`/citas?servicio=${s.id}`} variant="outline" size="sm" className="mt-6">
                 Agendar cita
               </ButtonLink>
             </article>
           ))}
         </div>
 
-        <FeaturedService service={featured[1]} image={photos.corgi} imageAlt="Corgi mirando a la cámara" reverse />
+        <FeaturedService
+          service={featured[1]}
+          image={travelCarrier?.image ?? photos.aussie}
+          imageAlt={travelCarrier ? "Transportadora para mascotas, ideal para viajes" : "Perro de viaje"}
+          reverse
+        />
       </Container>
 
       <section className="border-y border-border bg-card py-14 sm:py-16">
@@ -124,7 +117,7 @@ function FeaturedService({
             </li>
           ))}
         </ul>
-        <ButtonLink to={`/contacto?servicio=${s.id}`} className="mt-6">
+        <ButtonLink to={`/citas?servicio=${s.id}`} className="mt-6">
           Agendar cita
         </ButtonLink>
       </div>

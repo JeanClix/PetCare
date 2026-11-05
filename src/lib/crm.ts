@@ -113,6 +113,21 @@ export type CaptureLeadInput = {
   marketingConsent: boolean;
 };
 
+export type PublicContactInput = {
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+  consent: true;
+  marketingConsent: boolean;
+};
+
+export function sendPublicContact(input: PublicContactInput) {
+  return adminRequest<{ ok: true }>("/contact", input);
+}
+
 export async function getCrmData(token: string): Promise<CrmData> {
   const result = await adminRequest<CrmApiData>("/crm/read", {}, token);
   return {
@@ -284,13 +299,98 @@ export async function migrateLegacyCrm(token: string) {
 export type Appointment = Pick<CrmLead, "id" | "contactId" | "owner" | "email" | "phone" | "status" | "channel" | "service" | "pet" | "details" | "createdAt"> & {
   recordId: string | null;
   recordPetId: string | null;
+  slotId: string | null;
+  scheduledAt: string | null;
+  endsAt: string | null;
+  veterinarianName: string | null;
+  price: number | null;
 };
 
-export async function getAppointments(token: string): Promise<Appointment[]> {
-  const result = await adminRequest<{ appointments: Appointment[] }>("/crm/appointments", {}, token);
-  return result.appointments.map((appointment) => ({ ...appointment, createdAt: new Date(appointment.createdAt).toISOString() }));
+export type AppointmentSlot = {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  status: "available" | "reserved" | "booked" | "cancelled";
+  veterinarianId: string;
+  veterinarianName: string;
+};
+
+export type CustomerAppointment = {
+  id: string;
+  status: CrmLeadStatus;
+  service: string;
+  pet: string;
+  createdAt: string;
+  scheduledAt: string | null;
+  endsAt: string | null;
+  veterinarianName: string | null;
+  price: number | null;
+};
+
+function normalizeAppointmentPrice(value: number | string | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const price = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(price) || price < 0) throw new Error("El CRM devolvió un costo de cita inválido.");
+  return price;
 }
 
-export async function setAppointmentStatus(token: string, id: string, status: CrmLeadStatus) {
-  await adminRequest("/crm/appointment-status", { id, status }, token);
+export async function getAppointments(token: string): Promise<Appointment[]> {
+  const result = await adminRequest<{ appointments: Array<Omit<Appointment, "price"> & { price?: number | string | null }> }>("/crm/appointments", {}, token);
+  return result.appointments.map((appointment) => ({
+    ...appointment,
+    createdAt: new Date(appointment.createdAt).toISOString(),
+    scheduledAt: appointment.scheduledAt ? new Date(appointment.scheduledAt).toISOString() : null,
+    endsAt: appointment.endsAt ? new Date(appointment.endsAt).toISOString() : null,
+    price: normalizeAppointmentPrice(appointment.price),
+  }));
+}
+
+export async function getAppointmentSlots(token: string): Promise<AppointmentSlot[]> {
+  const result = await adminRequest<{ slots: AppointmentSlot[] }>("/appointment-slots", {}, token);
+  return result.slots.map((slot) => ({
+    ...slot,
+    startsAt: new Date(slot.startsAt).toISOString(),
+    endsAt: new Date(slot.endsAt).toISOString(),
+  }));
+}
+
+export async function createAppointmentSlot(
+  token: string,
+  slot: { startsAt: string; endsAt: string; veterinarianId?: string },
+) {
+  return adminRequest<{ id: string }>("/appointment-slot-create", slot, token);
+}
+
+export async function cancelAppointmentSlot(token: string, id: string) {
+  await adminRequest("/appointment-slot-cancel", { id }, token);
+}
+
+export async function bookAppointment(
+  token: string,
+  appointment: {
+    slotId: string;
+    service: string;
+    pet: string;
+    phone: string;
+    details?: string;
+    consent: true;
+    marketingConsent: boolean;
+  },
+) {
+  return adminRequest<{ ok: true; appointmentId: string }>("/book-appointment", appointment, token);
+}
+
+export async function getMyAppointments(token: string): Promise<CustomerAppointment[]> {
+  const result = await adminRequest<{ appointments: Array<Omit<CustomerAppointment, "price"> & { price?: number | string | null }> }>("/my-appointments", {}, token);
+  return result.appointments.map((appointment) => ({
+    ...appointment,
+    createdAt: new Date(appointment.createdAt).toISOString(),
+    scheduledAt: appointment.scheduledAt ? new Date(appointment.scheduledAt).toISOString() : null,
+    endsAt: appointment.endsAt ? new Date(appointment.endsAt).toISOString() : null,
+    price: normalizeAppointmentPrice(appointment.price),
+  }));
+}
+
+export async function setAppointmentStatus(token: string, id: string, status: CrmLeadStatus, price?: number) {
+  await adminRequest("/crm/appointment-status", { id, status, price }, token);
 }

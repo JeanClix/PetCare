@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowClockwise,
+  CalendarBlank,
   CalendarCheck,
   ChartBar,
   ChatCircleDots,
@@ -24,6 +25,7 @@ import { isAdminAuthConfigured, isStaffRole, type StaffRole } from "@/lib/adminA
 import { cn } from "@/lib/utils";
 import { AdminAccounts } from "@/pages/AdminAccounts";
 import { AppointmentsBoard } from "@/pages/AppointmentsBoard";
+import { AvailabilityManager } from "@/pages/clinic/AvailabilityManager";
 import { PatientsView } from "@/pages/clinic/PatientsView";
 import { WhatsappSettings } from "@/pages/WhatsappSettings";
 import { WhatsappComposer } from "@/components/staff/WhatsappComposer";
@@ -56,7 +58,7 @@ const statusLabels: Record<CrmLeadStatus, string> = {
   closed: "Cerrado",
 };
 
-type AdminView = "dashboard" | "leads" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "patients" | "whatsapp" | "social";
+type AdminView = "dashboard" | "leads" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "availability" | "patients" | "whatsapp" | "social";
 
 const adminViews: Record<AdminView, { label: string; description: string; icon: typeof Gauge; roles: StaffRole[] }> = {
   dashboard: { label: "Dashboard", description: "Resumen de solicitudes, contactos y mensajes guardados en Neon.", icon: Gauge, roles: ["admin", "sales"] },
@@ -67,6 +69,7 @@ const adminViews: Record<AdminView, { label: string; description: string; icon: 
   analytics: { label: "Analítica digital", description: "Actividad registrada por formulario y WhatsApp.", icon: ChartBar, roles: ["admin", "sales"] },
   recommendations: { label: "Recomendaciones", description: "Pendientes que conviene atender primero.", icon: Lightbulb, roles: ["admin", "sales"] },
   appointments: { label: "Citas", description: "Solicitudes de cita de los clientes y su estado de atención.", icon: CalendarCheck, roles: ["admin", "sales", "veterinarian"] },
+  availability: { label: "Disponibilidad", description: "Publica y administra los horarios de atención.", icon: CalendarBlank, roles: ["admin", "veterinarian"] },
   patients: { label: "Pacientes", description: "Historial clínico de cada mascota: datos, antecedentes y atenciones.", icon: FirstAidKit, roles: ["admin", "veterinarian"] },
   whatsapp: { label: "WhatsApp", description: "Número de la clínica enlazado y mensajes enviados desde el panel.", icon: WhatsappLogo, roles: ["admin"] },
   social: { label: "Redes Sociales", description: "Conecta Facebook e Instagram y publica contenido desde PetCare.", icon: ShareNetwork, roles: ["admin"] },
@@ -76,7 +79,7 @@ const adminViews: Record<AdminView, { label: string; description: string; icon: 
 const adminSections: Array<{ label: string; views: AdminView[] }> = [
   { label: "General", views: ["dashboard"] },
   { label: "Ventas", views: ["leads", "contacts", "messages"] },
-  { label: "Clínica", views: ["appointments", "patients"] },
+  { label: "Clínica", views: ["appointments", "availability", "patients"] },
   { label: "Marketing", views: ["marketing", "social", "analytics", "recommendations"] },
   { label: "Administración", views: ["accounts", "whatsapp"] },
 ];
@@ -302,7 +305,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
         description={current.description}
         user={user}
         onLogout={onLogout}
-        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "whatsapp" && activeView !== "social" && (
+        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "availability" && activeView !== "whatsapp" && activeView !== "social" && (
           <Button
             variant="outline"
             size="sm"
@@ -330,12 +333,14 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
             key={appointmentsVersion}
             token={token}
             clinicAccess={clinicAccess}
+            canConfirm={role === "admin" || role === "sales"}
             onOpenPatient={(petId) => {
               setSelectedPatientId(petId);
               setActiveView("patients");
             }}
           />
         )}
+        {activeView === "availability" && <AvailabilityManager token={token} role={role} />}
         {activeView === "whatsapp" && <WhatsappSettings token={token} />}
         {activeView === "social" && <SocialMediaManager token={token} oauthState={socialOAuthState} />}
         {activeView === "patients" && <PatientsView token={token} selectedId={selectedPatientId} onSelect={setSelectedPatientId} />}

@@ -1,4 +1,4 @@
-import { MagnifyingGlass, X } from "@phosphor-icons/react";
+import { Funnel, MagnifyingGlass, X } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
@@ -70,18 +70,20 @@ export function Shop() {
         description="Alimentos, farmacia, higiene y accesorios para perros, gatos y exóticos, recomendados por nuestros médicos."
       />
 
-      <Container className="py-8 sm:py-10">
-        <div className="z-20 mb-7 rounded-card border border-border bg-card p-4 shadow-soft sm:p-5 lg:sticky lg:top-[7.5rem]">
+      <Container className="py-6 sm:py-8">
+        <div className="mb-6 rounded-card border border-border bg-card p-4 shadow-soft sm:p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-black text-primary">Encuentra lo que necesitas</h2>
+            <h2 className="flex items-center gap-2 font-display text-lg font-black text-primary">
+              <Funnel weight="duotone" className="size-5 text-accent" /> Filtrar productos
+            </h2>
             {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })}>
-                <X weight="bold" /> Limpiar
+              <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })} className="shrink-0">
+                <X weight="bold" /> Limpiar filtros
               </Button>
             )}
           </div>
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <label className="relative flex-1">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_15rem]">
+            <label className="relative min-w-0">
               <span className="sr-only">Buscar productos</span>
               <MagnifyingGlass weight="bold" className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -89,15 +91,15 @@ export function Shop() {
                 value={query}
                 onChange={(e) => update("q", e.target.value, "")}
                 placeholder="Buscar productos"
-                className="h-12 w-full rounded-full border-2 border-border bg-background pr-4 pl-11 text-[0.95rem] placeholder:text-muted-foreground/80 focus:border-accent focus:outline-none"
+                className="h-11 w-full rounded-xl border border-border bg-background pr-4 pl-11 text-sm placeholder:text-muted-foreground/80 focus:border-accent focus:outline-none"
               />
             </label>
             <label className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="shrink-0 text-muted-foreground">Ordenar:</span>
+              <span className="shrink-0 font-semibold text-muted-foreground">Ordenar</span>
               <select
                 value={sort}
                 onChange={(e) => update("orden", e.target.value, "recientes")}
-                className="h-12 min-w-0 flex-1 rounded-full border-2 border-border bg-background px-4 text-[0.95rem] focus:border-accent focus:outline-none sm:w-auto sm:flex-none"
+                className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none"
               >
                 {Object.entries(sortLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -108,7 +110,7 @@ export function Shop() {
             </label>
           </div>
 
-          <div className="grid gap-4 border-t border-border pt-4">
+          <div className="mt-4 grid gap-4 border-t border-border pt-4 md:grid-cols-2">
             <ChipGroup
               label="Mascota"
               value={pet}
@@ -124,7 +126,7 @@ export function Shop() {
           </div>
         </div>
 
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{results.length}</span>{" "}
             {results.length === 1 ? "producto" : "productos"}
@@ -132,7 +134,7 @@ export function Shop() {
         </div>
 
         {results.length > 0 ? (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 sm:gap-y-9 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {results.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
@@ -163,16 +165,16 @@ function ChipGroup<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="grid min-w-0 gap-2 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:items-center sm:gap-3">
-      <span className="text-sm font-bold text-muted-foreground">{label}</span>
-      <div role="group" aria-label={label} className="flex flex-wrap gap-2">
+    <div className="min-w-0">
+      <span className="mb-2 block text-xs font-extrabold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
         {(Object.entries(options) as [T, string][]).map(([key, text]) => (
           <button
             key={key}
             onClick={() => onChange(key)}
             aria-pressed={value === key}
             className={cn(
-              "rounded-full border px-3.5 py-1.5 font-display text-sm font-bold transition-colors sm:px-4",
+              "rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors",
               value === key
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background text-foreground hover:border-accent hover:bg-accent-soft hover:text-accent",
