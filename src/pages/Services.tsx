@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { photos, services, travelPhotoCredit, type Service } from "@/data/site";
+import { photos, services, type Service } from "@/data/site";
 import { cn } from "@/lib/utils";
 import { VisitUs } from "@/pages/Home";
 
@@ -61,8 +61,8 @@ export function Services() {
         <FeaturedService
           service={featured[1]}
           image={photos.travel}
-          imageAlt="Perro junto a su pasaporte y maletas para viajar"
-          imageCredit
+          imageAlt="Perro viajando dentro de una maleta con su dueño"
+          compact
           reverse
         />
       </Container>
@@ -98,40 +98,33 @@ function FeaturedService({
   service: s,
   image,
   imageAlt,
-  imageCredit = false,
+  compact = false,
   reverse = false,
 }: {
   service: Service;
   image: string;
   imageAlt: string;
-  imageCredit?: boolean;
+  compact?: boolean;
   reverse?: boolean;
 }) {
   return (
     <article id={s.id} className="reveal grid scroll-mt-32 overflow-hidden rounded-media bg-card shadow-soft lg:grid-cols-2">
-      <figure className={cn("relative h-64 lg:h-full", reverse && "lg:order-2")}>
+      <figure className={cn("relative h-64", compact ? "lg:h-96" : "lg:h-full", reverse && "lg:order-2")}>
         <img src={image} alt={imageAlt} className="size-full object-cover object-[58%_center]" />
-        {imageCredit && (
-          <figcaption className="absolute right-2 bottom-2 rounded-md bg-white/90 px-2 py-1 text-[0.65rem] text-muted-foreground shadow-sm">
-            <a href={travelPhotoCredit.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-              {travelPhotoCredit.label}
-            </a>
-          </figcaption>
-        )}
       </figure>
-      <div className="p-7 sm:p-10">
+      <div className={cn(compact ? "p-6 sm:p-7" : "p-7 sm:p-10")}>
         <ServiceIcon name={s.icon} className="size-10 text-accent" />
-        <h2 className="mt-4 text-3xl font-black">{s.name}</h2>
-        <p className="mt-2 max-w-[56ch] text-muted-foreground">{s.summary}</p>
-        <ul className="mt-5 grid gap-2.5 sm:grid-cols-2">
+        <h2 className={cn("font-black", compact ? "mt-2 text-2xl sm:text-3xl" : "mt-4 text-3xl")}>{s.name}</h2>
+        <p className={cn("max-w-[56ch] text-muted-foreground", compact ? "mt-1.5" : "mt-2")}>{s.summary}</p>
+        <ul className={cn("grid sm:grid-cols-2", compact ? "mt-3 gap-x-4 gap-y-2" : "mt-5 gap-2.5")}>
           {s.bullets!.map((b) => (
-            <li key={b} className="flex gap-2.5 text-[0.95rem] font-semibold">
+            <li key={b} className={cn("flex font-semibold", compact ? "gap-2 text-sm" : "gap-2.5 text-[0.95rem]")}>
               <Check weight="bold" className="mt-0.5 size-5 shrink-0 text-accent" />
               {b}
             </li>
           ))}
         </ul>
-        <ButtonLink to={`/citas?servicio=${s.id}`} className="mt-6">
+        <ButtonLink to={`/citas?servicio=${s.id}`} className={cn(compact ? "mt-4" : "mt-6")}>
           Agendar cita
         </ButtonLink>
       </div>
