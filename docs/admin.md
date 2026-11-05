@@ -70,6 +70,12 @@ La sección **Pacientes** lista las mascotas con buscador y muestra el historial
 
 Los datos viven en `petcare_pets` y `petcare_clinical_records` (`migrations/20261020_petcare_clinical_history.sql`). Ventas no tiene acceso a los datos clínicos; el backend lo valida con `CLINIC_ACTIONS`. Tras desplegar la función, Neon puede seguir respondiendo con la versión anterior durante uno o dos minutos.
 
+## Disponibilidad de citas
+
+En **Clínica -> Disponibilidad**, administración puede publicar horarios para cualquiera de los servicios del catálogo; elegir un veterinario es opcional. Así se pueden ofrecer citas generales, baños, grooming y otros servicios aunque aún no haya cuentas de veterinarios. El servicio del horario se guarda y la agenda del cliente solo muestra cupos que coinciden con el servicio seleccionado. Si se asigna un veterinario, se impiden cruces con sus otros horarios; también se impiden dos cupos superpuestos para un mismo servicio.
+
+La función `admin` agrega automáticamente la columna de servicio y permite que los horarios no tengan todavía veterinario asignado; los horarios existentes se conservan como **Consultas**. Despliega la función de Neon junto con el frontend para activar el cambio en producción.
+
 ## Registro de compras confirmadas
 
 La seccion **Ventas -> Compras por cliente** permite a administradores y ventas registrar una compra despues de confirmar la venta. Cada registro queda asociado a un contacto, conserva productos, cantidades, precio unitario, total, fecha y quien lo registro; el historial se agrupa por cliente. Los precios se pueden ajustar al registrar para guardar el importe realmente cobrado.
