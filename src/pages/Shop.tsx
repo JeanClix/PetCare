@@ -1,4 +1,4 @@
-import { Funnel, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { MagnifyingGlass, X } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,7 +13,6 @@ import {
   type Pet,
 } from "@/data/products";
 import { business } from "@/data/site";
-import { cn } from "@/lib/utils";
 
 type Sort = "recientes" | "precio-asc" | "precio-desc" | "nombre";
 
@@ -71,18 +70,8 @@ export function Shop() {
       />
 
       <Container className="py-6 sm:py-8">
-        <div className="mb-6 rounded-card border border-border bg-card p-4 shadow-soft sm:p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 font-display text-lg font-black text-primary">
-              <Funnel weight="duotone" className="size-5 text-accent" /> Filtrar productos
-            </h2>
-            {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })} className="shrink-0">
-                <X weight="bold" /> Limpiar filtros
-              </Button>
-            )}
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_15rem]">
+        <div className="mb-5 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_15.5rem]">
             <label className="relative min-w-0">
               <span className="sr-only">Buscar productos</span>
               <MagnifyingGlass weight="bold" className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -90,16 +79,16 @@ export function Shop() {
                 type="search"
                 value={query}
                 onChange={(e) => update("q", e.target.value, "")}
-                placeholder="Buscar productos"
-                className="h-11 w-full rounded-xl border border-border bg-background pr-4 pl-11 text-sm placeholder:text-muted-foreground/80 focus:border-accent focus:outline-none"
+                placeholder="Buscar: shampoo, Hill's, oftálmico..."
+                className="h-12 w-full rounded-xl border border-border bg-sky/20 pr-4 pl-11 text-sm placeholder:text-muted-foreground/80 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
               />
             </label>
             <label className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="shrink-0 font-semibold text-muted-foreground">Ordenar</span>
+              <span className="shrink-0 text-muted-foreground">Ordenar</span>
               <select
                 value={sort}
                 onChange={(e) => update("orden", e.target.value, "recientes")}
-                className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none"
+                className="h-12 min-w-0 flex-1 rounded-xl border border-border bg-sky/20 px-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
               >
                 {Object.entries(sortLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -110,19 +99,35 @@ export function Shop() {
             </label>
           </div>
 
-          <div className="mt-4 grid gap-4 border-t border-border pt-4 md:grid-cols-2">
-            <ChipGroup
-              label="Mascota"
-              value={pet}
-              options={{ all: "Todas", ...petLabels }}
-              onChange={(v) => update("mascota", v, "all")}
-            />
-            <ChipGroup
-              label="Categoría"
-              value={category}
-              options={{ all: "Todas", ...categoryLabels }}
-              onChange={(v) => update("categoria", v, "all")}
-            />
+          <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2 sm:gap-4">
+            <label className="min-w-0">
+              <span className="mb-1.5 block text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground">Mascota</span>
+              <select
+                value={pet}
+                onChange={(e) => update("mascota", e.target.value, "all")}
+                aria-label="Filtrar por mascota"
+                className="h-11 w-full rounded-xl border border-border bg-sky/20 px-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              >
+                <option value="all">Todas las mascotas</option>
+                {Object.entries(petLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="min-w-0">
+              <span className="mb-1.5 block text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground">Categoría</span>
+              <select
+                value={category}
+                onChange={(e) => update("categoria", e.target.value, "all")}
+                aria-label="Filtrar por categoría"
+                className="h-11 w-full rounded-xl border border-border bg-sky/20 px-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              >
+                <option value="all">Todas las categorías</option>
+                {Object.entries(categoryLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 
@@ -131,6 +136,11 @@ export function Shop() {
             <span className="font-semibold text-foreground">{results.length}</span>{" "}
             {results.length === 1 ? "producto" : "productos"}
           </p>
+          {hasFilters && (
+            <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })} className="shrink-0">
+              <X weight="bold" /> Limpiar filtros
+            </Button>
+          )}
         </div>
 
         {results.length > 0 ? (
@@ -150,40 +160,5 @@ export function Shop() {
         )}
       </Container>
     </>
-  );
-}
-
-function ChipGroup<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: Record<T, string>;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="min-w-0">
-      <span className="mb-2 block text-xs font-extrabold uppercase tracking-wide text-muted-foreground">{label}</span>
-      <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
-        {(Object.entries(options) as [T, string][]).map(([key, text]) => (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            aria-pressed={value === key}
-            className={cn(
-              "rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors",
-              value === key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-foreground hover:border-accent hover:bg-accent-soft hover:text-accent",
-            )}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

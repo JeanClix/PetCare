@@ -64,7 +64,7 @@ export const services: Service[] = [
   },
   {
     id: "banos",
-    name: "Baños",
+    name: "Baños de mascotas",
     icon: "bath",
     summary: "Baños estéticos y medicados con productos premium.",
     description:
@@ -153,12 +153,17 @@ export const photos = {
   beagle: unsplash("1543466835-00a7907e9de1", 1100),
   cat: unsplash("1514888286974-6c03e2ca1dba", 700),
   guineaPigs: unsplash("1548767797-d8c844163c4c", 700),
-  puppy: unsplash("1576201836106-db1758fd1c97", 1000),
+  consultation: unsplash("1628009368231-7bb7cfcb0def", 1000),
   bath: unsplash("1516734212186-a967f81ad0d7", 1000),
-  frenchie: unsplash("1583337130417-3346a1be7dee", 1000),
   corgi: unsplash("1537151608828-ea2b11777ee8", 800),
   aussie: unsplash("1587300003388-59208cc962cb", 1000),
   friends: unsplash("1450778869180-41d0601e046e", 1000),
+  travel: asset("/img/services/pet-travel.jpg"),
+};
+
+export const travelPhotoCredit = {
+  label: "Foto: Jennifer Jacquemart / Comisión Europea · CC BY 4.0",
+  url: "https://commons.wikimedia.org/wiki/File:European_pet_passport_(P-063737-00-13).jpg",
 };
 
 // Logos descargados de petcareperu.com/marcas
