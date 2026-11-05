@@ -213,11 +213,11 @@ function TravelFeature() {
               </ButtonLink>
             </div>
           </div>
-          <div className="h-64 overflow-hidden bg-white sm:h-72 lg:h-96">
+          <div className="relative h-64 overflow-hidden bg-white sm:h-72 lg:h-auto lg:min-h-[24rem]">
             <img
               src={photos.travel}
               alt="Perro viajando dentro de una maleta con su dueño"
-              className="size-full object-cover object-[58%_center]"
+              className="absolute inset-0 size-full object-cover object-[58%_center]"
             />
           </div>
         </div>
