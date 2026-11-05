@@ -10,6 +10,7 @@ import {
   FirstAidKit,
   Gauge,
   Lightbulb,
+  Receipt,
   ShareNetwork,
   UserGear,
   Users,
@@ -29,6 +30,7 @@ import { AvailabilityManager } from "@/pages/clinic/AvailabilityManager";
 import { PatientsView } from "@/pages/clinic/PatientsView";
 import { WhatsappSettings } from "@/pages/WhatsappSettings";
 import { WhatsappComposer } from "@/components/staff/WhatsappComposer";
+import { PurchaseRegister } from "@/components/staff/PurchaseRegister";
 import type { WhatsappContext } from "@/lib/whatsapp";
 import {
   clearCrmData,
@@ -49,6 +51,7 @@ import {
   type CrmLeadType,
   type MessageStatus,
   type CrmData,
+  type CustomerPurchase,
 } from "@/lib/crm";
 
 const statusLabels: Record<CrmLeadStatus, string> = {
@@ -58,11 +61,12 @@ const statusLabels: Record<CrmLeadStatus, string> = {
   closed: "Cerrado",
 };
 
-type AdminView = "dashboard" | "leads" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "availability" | "patients" | "whatsapp" | "social";
+type AdminView = "dashboard" | "leads" | "purchases" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "availability" | "patients" | "whatsapp" | "social";
 
 const adminViews: Record<AdminView, { label: string; description: string; icon: typeof Gauge; roles: StaffRole[] }> = {
   dashboard: { label: "Dashboard", description: "Resumen de solicitudes, contactos y mensajes guardados en Neon.", icon: Gauge, roles: ["admin", "sales"] },
   leads: { label: "Pedidos y solicitudes", description: "Pedidos de la tienda y solicitudes de cita capturadas en la web.", icon: ClipboardText, roles: ["admin", "sales"] },
+  purchases: { label: "Compras por cliente", description: "Registra ventas confirmadas y consulta el historial de compras por cliente.", icon: Receipt, roles: ["admin", "sales"] },
   contacts: { label: "Clientes y contactos", description: "Contactos del CRM, etapa del ciclo de vida y consentimiento.", icon: Users, roles: ["admin", "sales"] },
   messages: { label: "Mensajes", description: "Mensajes recibidos desde formularios y WhatsApp.", icon: ChatCircleDots, roles: ["admin", "sales"] },
   marketing: { label: "Email marketing", description: "Campañas por segmento con consentimiento verificado.", icon: EnvelopeSimple, roles: ["admin", "sales"] },
@@ -78,7 +82,7 @@ const adminViews: Record<AdminView, { label: string; description: string; icon: 
 
 const adminSections: Array<{ label: string; views: AdminView[] }> = [
   { label: "General", views: ["dashboard"] },
-  { label: "Ventas", views: ["leads", "contacts", "messages"] },
+  { label: "Ventas", views: ["leads", "purchases", "contacts", "messages"] },
   { label: "Clínica", views: ["appointments", "availability", "patients"] },
   { label: "Marketing", views: ["marketing", "social", "analytics", "recommendations"] },
   { label: "Administración", views: ["accounts", "whatsapp"] },
@@ -136,6 +140,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
   const canReadCrm = role === "admin" || role === "sales";
   const isAdmin = role === "admin";
   const [leads, setLeads] = useState<CrmLead[]>([]);
+  const [purchases, setPurchases] = useState<CustomerPurchase[]>([]);
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [marketing, setMarketing] = useState<CrmData["marketing"]>({
@@ -184,6 +189,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
     try {
       const data = await getCrmData(token);
       setLeads(data.leads);
+      setPurchases(data.purchases);
       setContacts(data.contacts);
       setMessages(data.messages);
       setMarketing(data.marketing);
@@ -293,7 +299,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
     }))
     .filter((section) => section.items.length > 0);
   const current = adminViews[activeView];
-  const showsCrmToolbar = activeView === "leads" || activeView === "contacts" || activeView === "messages";
+  const showsCrmToolbar = activeView === "leads" || activeView === "purchases" || activeView === "contacts" || activeView === "messages";
 
   return (
     <>
@@ -390,7 +396,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
             size="sm"
             className="text-danger hover:bg-danger/10"
             onClick={async () => {
-              if (!window.confirm("¿Seguro que quieres borrar los datos del CRM? Esta acción no se puede deshacer.")) return;
+              if (!window.confirm("¿Seguro que quieres borrar los datos del CRM, incluidos los clientes y su historial de compras? Esta acción no se puede deshacer.")) return;
               setCrmError("");
               try {
                 await clearCrmData(token);
@@ -410,6 +416,19 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
             <span className="font-semibold text-danger">{crmError}</span>
             <Button size="sm" variant="ghost" onClick={() => void refreshCrm()}>Reintentar</Button>
           </div>
+        )}
+        {activeView === "purchases" && (
+          loading ? (
+            <div role="status" className="rounded-media border border-border bg-card px-6 py-16 text-center text-muted-foreground shadow-soft">Cargando compras desde la base de datos...</div>
+          ) : (
+            <PurchaseRegister
+              contacts={contacts}
+              purchases={purchases}
+              token={token}
+              searchTerm={searchTerm}
+              onSaved={() => refreshCrm(false)}
+            />
+          )
         )}
         {activeView === "leads" && legacyCount > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">

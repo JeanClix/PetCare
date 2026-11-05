@@ -57,10 +57,30 @@ export type CrmLead = {
   details?: string;
 };
 
+export type PurchaseItem = {
+  productId: number | null;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type CustomerPurchase = {
+  id: string;
+  contactId: string;
+  customerName: string;
+  email: string;
+  phone: string;
+  items: PurchaseItem[];
+  total: number;
+  recordedBy: string;
+  createdAt: string;
+};
+
 export type CrmData = {
   contacts: ContactRecord[];
   messages: ContactMessage[];
   leads: CrmLead[];
+  purchases: CustomerPurchase[];
   marketing: {
     available: boolean;
     webhookConfigured: boolean;
@@ -93,8 +113,9 @@ export type CrmData = {
   };
 };
 
-type CrmApiData = Omit<CrmData, "leads"> & {
+type CrmApiData = Omit<CrmData, "leads" | "purchases"> & {
   leads: Array<Omit<CrmLead, "total"> & { total?: number | string | null }>;
+  purchases?: Array<Omit<CustomerPurchase, "total"> & { total: number | string }>;
 };
 
 export type CaptureLeadInput = {
@@ -141,6 +162,25 @@ export async function getCrmData(token: string): Promise<CrmData> {
       }
       return { ...lead, total, createdAt: new Date(lead.createdAt).toISOString() };
     }),
+    purchases: (result.purchases ?? []).map((purchase) => {
+      const total = typeof purchase.total === "number" ? purchase.total : Number(purchase.total);
+      if (
+        !Number.isFinite(total) ||
+        !Array.isArray(purchase.items) ||
+        purchase.items.some((item) =>
+          !item ||
+          typeof item.name !== "string" ||
+          !Number.isSafeInteger(item.quantity) ||
+          item.quantity < 1 ||
+          typeof item.unitPrice !== "number" ||
+          !Number.isFinite(item.unitPrice) ||
+          item.unitPrice < 0
+        )
+      ) {
+        throw new Error("El CRM devolviÃ³ un registro de compra invÃ¡lido.");
+      }
+      return { ...purchase, total, createdAt: new Date(purchase.createdAt).toISOString() };
+    }),
     marketing: result.marketing ?? {
       available: false,
       webhookConfigured: false,
@@ -156,6 +196,10 @@ export async function getCrmData(token: string): Promise<CrmData> {
       campaignHistory: [],
     },
   };
+}
+
+export function createCustomerPurchase(token: string, purchase: { contactId: string; items: PurchaseItem[] }) {
+  return adminRequest<{ id: string }>("/crm/purchase-create", purchase, token);
 }
 
 export function captureCrmLead(input: CaptureLeadInput) {

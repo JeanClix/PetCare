@@ -42,13 +42,13 @@ const STAFF_PERMISSIONS: Record<Exclude<AccountRole, "customer">, ReadonlySet<st
   admin: new Set([
     "accounts", "account-role", "read", "appointments", "appointment-status", "appointment-slots",
     "appointment-slot-create", "appointment-slot-cancel", "marketing-test-send", "marketing-send",
-    "lifecycle", "contact-notes", "message-status", "lead-status", "clear", "import-lead",
+    "lifecycle", "contact-notes", "message-status", "lead-status", "clear", "import-lead", "purchase-create",
     ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS, "whatsapp-status", "whatsapp-logout",
     ...SOCIAL_ADMIN_ACTIONS,
   ]),
   sales: new Set([
     "read", "appointments", "appointment-status", "appointment-slots", "marketing-test-send", "marketing-send",
-    "lifecycle", "contact-notes", "message-status", "lead-status", ...WHATSAPP_SEND_ACTIONS,
+    "lifecycle", "contact-notes", "message-status", "lead-status", "purchase-create", ...WHATSAPP_SEND_ACTIONS,
   ]),
   veterinarian: new Set([
     "appointments", "appointment-status", "appointment-slots", "appointment-slot-create", "appointment-slot-cancel",
@@ -433,6 +433,17 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_purchases (
+      id UUID PRIMARY KEY,
+      contact_id UUID NOT NULL REFERENCES petcare_contacts(id) ON DELETE CASCADE,
+      items JSONB NOT NULL,
+      total NUMERIC(12, 2) NOT NULL CHECK (total >= 0),
+      recorded_by TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS petcare_purchases_contact_date_idx ON petcare_purchases (contact_id, created_at DESC)`;
   await sql`
     CREATE TABLE IF NOT EXISTS petcare_appointment_slots (
       id UUID PRIMARY KEY,
@@ -1970,7 +1981,7 @@ export default {
         return response({ ok: true }, 200, origin);
       }
       if (action === "read") {
-        const [contacts, messages, leads, campaignStats, segmentCounts, campaignHistory] = await Promise.all([
+        const [contacts, messages, leads, purchases, campaignStats, segmentCounts, campaignHistory] = await Promise.all([
           sql`SELECT id, firstname, lastname, email, phone, source, lifecycle,
             lifecycle_updated_at AS "lifecycleUpdatedAt", lifecycle_reason AS "lifecycleReason",
             engagement_count AS "engagementCount", order_request_count AS "orderRequestCount",
@@ -1986,6 +1997,11 @@ export default {
             l.items, l.details, l.created_at AS "createdAt"
             FROM petcare_leads l JOIN petcare_contacts c ON c.id = l.contact_id
             ORDER BY l.created_at DESC`,
+          sql`SELECT p.id, p.contact_id AS "contactId",
+            concat_ws(' ', c.firstname, c.lastname) AS "customerName", c.email, c.phone,
+            p.items, p.total, p.recorded_by AS "recordedBy", p.created_at AS "createdAt"
+            FROM petcare_purchases p JOIN petcare_contacts c ON c.id = p.contact_id
+            ORDER BY p.created_at DESC`,
           sql`SELECT
             (SELECT count(*)::int FROM petcare_marketing_campaigns
               WHERE NOT is_test AND status IN ('sent', 'partial')) AS campaigns,
@@ -2067,6 +2083,7 @@ export default {
           contacts,
           messages,
           leads,
+          purchases,
           marketing: {
             available: Boolean(process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_MARKETING_FROM?.trim()),
             webhookConfigured: Boolean(process.env.RESEND_WEBHOOK_SECRET?.trim()),
@@ -2342,8 +2359,44 @@ export default {
         await sql`UPDATE petcare_leads SET status = ${status} WHERE id = ${id}::uuid`;
         return response({ ok: true }, 200, origin);
       }
+      if (action === "purchase-create") {
+        const contactId = text(body?.contactId, 36);
+        const rawItems = Array.isArray(body?.items) ? body.items : [];
+        if (!UUID_PATTERN.test(contactId) || rawItems.length === 0 || rawItems.length > 50) {
+          return response({ error: "Selecciona un cliente y agrega al menos un producto." }, 400, origin);
+        }
+        const items: Array<{ productId: number | null; name: string; quantity: number; unitPrice: number }> = [];
+        let totalCents = 0;
+        for (const rawItem of rawItems) {
+          if (!rawItem || typeof rawItem !== "object") return response({ error: "Hay un producto con datos invÃ¡lidos." }, 400, origin);
+          const item = rawItem as Record<string, unknown>;
+          const productId = typeof item.productId === "number" && Number.isSafeInteger(item.productId) && item.productId > 0
+            ? item.productId
+            : null;
+          const name = text(item.name, 200);
+          const quantity = typeof item.quantity === "number" && Number.isSafeInteger(item.quantity) ? item.quantity : 0;
+          const unitPrice = typeof item.unitPrice === "number" && Number.isFinite(item.unitPrice) ? item.unitPrice : Number.NaN;
+          if (!name || quantity < 1 || quantity > 1000 || !Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 100000) {
+            return response({ error: "Revisa el nombre, la cantidad y el precio de cada producto." }, 400, origin);
+          }
+          const unitPriceCents = Math.round(unitPrice * 100);
+          totalCents += unitPriceCents * quantity;
+          items.push({ productId, name, quantity, unitPrice: unitPriceCents / 100 });
+        }
+        const total = totalCents / 100;
+        const recordedBy = `${activeSession.firstname} ${activeSession.lastname}`.trim() || activeSession.sub;
+        const saved = await sql`
+          INSERT INTO petcare_purchases (id, contact_id, items, total, recorded_by)
+          SELECT ${crypto.randomUUID()}::uuid, c.id, ${JSON.stringify(items)}::jsonb, ${total}, ${recordedBy}
+          FROM petcare_contacts c WHERE c.id = ${contactId}::uuid
+          RETURNING id
+        `;
+        if (!saved.length) return response({ error: "No se encontrÃ³ el cliente seleccionado." }, 404, origin);
+        return response({ id: String(saved[0].id) }, 201, origin);
+      }
       if (action === "clear") {
         await sql.transaction([
+          sql`DELETE FROM petcare_purchases`,
           sql`DELETE FROM petcare_leads`,
           sql`DELETE FROM petcare_messages`,
           sql`DELETE FROM petcare_contacts`,

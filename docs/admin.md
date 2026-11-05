@@ -70,6 +70,12 @@ La sección **Pacientes** lista las mascotas con buscador y muestra el historial
 
 Los datos viven en `petcare_pets` y `petcare_clinical_records` (`migrations/20261020_petcare_clinical_history.sql`). Ventas no tiene acceso a los datos clínicos; el backend lo valida con `CLINIC_ACTIONS`. Tras desplegar la función, Neon puede seguir respondiendo con la versión anterior durante uno o dos minutos.
 
+## Registro de compras confirmadas
+
+La seccion **Ventas -> Compras por cliente** permite a administradores y ventas registrar una compra despues de confirmar la venta. Cada registro queda asociado a un contacto, conserva productos, cantidades, precio unitario, total, fecha y quien lo registro; el historial se agrupa por cliente. Los precios se pueden ajustar al registrar para guardar el importe realmente cobrado.
+
+Este registro es independiente de los pedidos iniciados desde la tienda: esos pedidos siguen siendo solicitudes coordinadas por WhatsApp y no cuentan como ventas confirmadas. La tabla `petcare_purchases` se crea de forma idempotente al atender una solicitud de la funcion `admin`; no requiere ejecutar una migracion manual. La creacion se limita a los roles `admin` y `sales`, y el borrado general del CRM tambien elimina los historiales de compra asociados.
+
 ## Fase 3: ciclo de vida de contactos
 
 Los contactos capturados comienzan como `lead`. Una segunda interacción o el inicio de una solicitud de pedido los actualiza a `interesado`. Cada contacto conserva contadores de interacciones y solicitudes de pedido, además de la razón y fecha del último cambio de etapa. El panel muestra el conteo por etapa y permite filtrar la lista al seleccionar cada etapa.
