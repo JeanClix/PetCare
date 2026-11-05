@@ -16,11 +16,13 @@ const columns: Array<{ status: CrmLeadStatus; label: string; hint: string }> = [
 export function AppointmentsBoard({
   token,
   clinicAccess,
+  canConfirm,
   onOpenPatient,
 }: {
   token: string;
   /** Veterinario y administrador registran atenciones; ventas solo ve el estado */
   clinicAccess: boolean;
+  canConfirm: boolean;
   onOpenPatient: (petId: string) => void;
 }) {
   const [attending, setAttending] = useState<Appointment | null>(null);
@@ -31,6 +33,7 @@ export function AppointmentsBoard({
   const [error, setError] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<CrmLeadStatus | "open">("open");
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -50,11 +53,28 @@ export function AppointmentsBoard({
   const visible = appointments.filter((item) => (filter === "open" ? item.status !== "closed" : item.status === filter));
 
   async function updateStatus(appointment: Appointment, status: CrmLeadStatus) {
+    if (status === "qualified" && !canConfirm) {
+      setError("Solo ventas o administración pueden confirmar una cita.");
+      return;
+    }
+    let price = appointment.price ?? undefined;
+    if (status === "qualified") {
+      const enteredPrice = priceDrafts[appointment.id] ?? (appointment.price === null ? "" : String(appointment.price));
+      price = Number(enteredPrice);
+      if (!enteredPrice.trim() || !Number.isFinite(price) || price < 0 || price > 100000) {
+        setError("Indica un costo válido, entre S/ 0 y S/ 100,000, antes de confirmar la cita.");
+        return;
+      }
+    }
     setSavingId(appointment.id);
     setError("");
     try {
-      await setAppointmentStatus(token, appointment.id, status);
-      setAppointments((current) => current.map((item) => (item.id === appointment.id ? { ...item, status } : item)));
+      await setAppointmentStatus(token, appointment.id, status, status === "qualified" ? price : undefined);
+      setAppointments((current) => current.map((item) => (
+        item.id === appointment.id
+          ? { ...item, status, price: status === "qualified" ? price ?? null : item.price }
+          : item
+      )));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo actualizar la cita.");
     } finally {
@@ -118,6 +138,30 @@ export function AppointmentsBoard({
                 </time>
               </div>
               {appointment.details && <p className="mt-3 line-clamp-3 text-sm whitespace-pre-wrap text-foreground/80">{appointment.details}</p>}
+              <div className="mt-3 grid gap-2 rounded-xl bg-muted/50 p-3 text-sm sm:grid-cols-2">
+                <p className="flex items-start gap-2 text-muted-foreground">
+                  <CalendarBlank weight="duotone" className="mt-0.5 size-4 shrink-0 text-accent" />
+                  {appointment.scheduledAt
+                    ? new Date(appointment.scheduledAt).toLocaleString("es-PE", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+                    : "Horario no asignado"}
+                </p>
+                <p className="text-muted-foreground">Veterinario: <span className="font-semibold text-foreground">{appointment.veterinarianName || "Por asignar"}</span></p>
+                <label className="flex items-center gap-2 text-muted-foreground sm:col-span-2">
+                  <span className="shrink-0">Costo (S/)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100000"
+                    step="0.01"
+                    inputMode="decimal"
+                    aria-label={`Costo de la cita de ${appointment.owner}`}
+                    value={priceDrafts[appointment.id] ?? (appointment.price === null ? "" : String(appointment.price))}
+                    onChange={(event) => setPriceDrafts((current) => ({ ...current, [appointment.id]: event.target.value }))}
+                    disabled={!canConfirm}
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-foreground focus:border-accent focus:outline-none"
+                  />
+                </label>
+              </div>
               <div className="mt-4 border-t border-border pt-3 text-sm">
                 <p className="font-bold">{appointment.owner}</p>
                 <p className="text-muted-foreground">{appointment.email}</p>
@@ -144,7 +188,7 @@ export function AppointmentsBoard({
                   onChange={(event) => void updateStatus(appointment, event.target.value as CrmLeadStatus)}
                   className="h-9 rounded-full border border-border bg-background px-3 text-sm font-semibold focus:border-accent focus:outline-none"
                 >
-                  {columns.map(({ status, label }) => <option key={status} value={status}>{label}</option>)}
+                  {columns.map(({ status, label }) => <option key={status} value={status} disabled={status === "qualified" && !canConfirm}>{label}</option>)}
                 </select>
                 {appointment.phone && (
                   <>

@@ -20,6 +20,7 @@ import { brands, business, photos, services, testimonials, yearsOfExperience } f
 import { cn } from "@/lib/utils";
 
 const byId = (id: string) => services.find((s) => s.id === id)!;
+const travelCarrier = products.find((product) => product.id === 2356);
 
 // Los 8 productos más recientes del catálogo original
 const featuredProducts = products.slice(0, 8);
@@ -54,7 +55,7 @@ function Hero() {
             Consultas, grooming y farmacia para perros, gatos y mascotas exóticas.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4">
-            <ButtonLink to="/contacto" size="lg">
+            <ButtonLink to="/citas" size="lg">
               Agendar cita
             </ButtonLink>
             <TextLink to="/tienda">
@@ -213,7 +214,11 @@ function TravelFeature() {
               </ButtonLink>
             </div>
           </div>
-          <img src={photos.frenchie} alt="Bulldog francés con polera amarilla" className="h-72 w-full object-cover lg:h-full" />
+          <img
+            src={travelCarrier?.image ?? photos.frenchie}
+            alt={travelCarrier ? "Transportadora para mascotas, ideal para viajes" : "Perro listo para viajar"}
+            className="h-72 w-full bg-white object-contain p-8 lg:h-full"
+          />
         </div>
       </Container>
     </section>
@@ -235,11 +240,11 @@ function ProductsRow() {
         </div>
       </Container>
       {/* Carril horizontal con scroll-snap; se alinea con el contenedor en pantallas grandes */}
-      <div className="mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-4 px-4 pb-4 [scrollbar-width:thin] sm:scroll-px-6 sm:px-6 xl:scroll-px-[calc((100vw-72rem)/2+1.5rem)] xl:px-[calc((100vw-72rem)/2+1.5rem)]">
-        {featuredProducts.map((p) => (
-          <ProductCard key={p.id} product={p} className="w-56 shrink-0 snap-start sm:w-60" />
-        ))}
-      </div>
+      <Container className="mt-8">
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-4">
+          {featuredProducts.map((p) => <ProductCard key={p.id} product={p} />)}
+        </div>
+      </Container>
     </section>
   );
 }
@@ -274,7 +279,7 @@ function Testimonials() {
         <SectionHeading eyebrow="Familias PetCare" title="Lo que cuentan los dueños" className="reveal" />
         <div className="mt-10 grid gap-5 lg:grid-cols-[1.35fr_1fr]">
           <figure className="reveal grid overflow-hidden rounded-media bg-sky sm:grid-cols-[0.8fr_1fr]">
-            <img src={photos.aussie} alt="Pastor australiano sonriendo en la playa" className="h-64 w-full object-cover sm:h-full" />
+            <img src={photos.aussie} alt="Perro pastor australiano al aire libre" className="h-64 w-full object-cover sm:h-full" />
             <div className="flex flex-col justify-between gap-6 p-7 sm:p-9">
               <blockquote className="font-display text-2xl leading-snug font-extrabold text-primary">“{main.quote}”</blockquote>
               <figcaption>
@@ -308,9 +313,9 @@ export function VisitUs() {
           <div>
             <h2 className="text-3xl leading-[1.08] font-black text-primary sm:text-4xl">Agenda la próxima visita de tu engreído</h2>
             <p className="mt-4 max-w-[48ch] text-lg text-muted-foreground">
-              Cuéntanos qué servicio necesitas y te contactamos para coordinar el horario.
+              Elige un horario disponible y reserva en línea.
             </p>
-            <ButtonLink to="/contacto" size="lg" className="mt-7">
+            <ButtonLink to="/citas" size="lg" className="mt-7">
               Agendar cita
             </ButtonLink>
           </div>

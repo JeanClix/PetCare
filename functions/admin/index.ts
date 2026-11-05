@@ -40,16 +40,20 @@ const SOCIAL_ADMIN_ACTIONS = [
 // Qué secciones del panel interno puede usar cada rol de staff
 const STAFF_PERMISSIONS: Record<Exclude<AccountRole, "customer">, ReadonlySet<string>> = {
   admin: new Set([
-    "accounts", "account-role", "read", "appointments", "appointment-status", "marketing-test-send", "marketing-send",
+    "accounts", "account-role", "read", "appointments", "appointment-status", "appointment-slots",
+    "appointment-slot-create", "appointment-slot-cancel", "marketing-test-send", "marketing-send",
     "lifecycle", "contact-notes", "message-status", "lead-status", "clear", "import-lead",
     ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS, "whatsapp-status", "whatsapp-logout",
     ...SOCIAL_ADMIN_ACTIONS,
   ]),
   sales: new Set([
-    "read", "appointments", "appointment-status", "marketing-test-send", "marketing-send",
+    "read", "appointments", "appointment-status", "appointment-slots", "marketing-test-send", "marketing-send",
     "lifecycle", "contact-notes", "message-status", "lead-status", ...WHATSAPP_SEND_ACTIONS,
   ]),
-  veterinarian: new Set(["appointments", "appointment-status", ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS]),
+  veterinarian: new Set([
+    "appointments", "appointment-status", "appointment-slots", "appointment-slot-create", "appointment-slot-cancel",
+    ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS,
+  ]),
 };
 
 type SessionClaims = {
@@ -297,6 +301,7 @@ type ContactInput = {
 type CaptureMetadata = {
   externalId?: string;
   accountId?: string;
+  appointmentSlotId?: string;
   createdAt?: string;
   status?: string;
   marketingConsentAt?: string;
@@ -428,6 +433,22 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_appointment_slots (
+      id UUID PRIMARY KEY,
+      veterinarian_id UUID NOT NULL REFERENCES petcare_users(id) ON DELETE CASCADE,
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'reserved', 'booked', 'cancelled')),
+      created_by_id UUID REFERENCES petcare_users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CHECK (ends_at > starts_at)
+    )
+  `;
+  await sql`ALTER TABLE petcare_leads ADD COLUMN IF NOT EXISTS appointment_slot_id UUID REFERENCES petcare_appointment_slots(id) ON DELETE SET NULL`;
+  await sql`ALTER TABLE petcare_leads ADD COLUMN IF NOT EXISTS appointment_price NUMERIC(10, 2)`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS petcare_leads_appointment_slot_idx ON petcare_leads (appointment_slot_id) WHERE appointment_slot_id IS NOT NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS petcare_appointment_slots_status_start_idx ON petcare_appointment_slots (status, starts_at)`;
   await sql`
     CREATE TABLE IF NOT EXISTS petcare_marketing_campaigns (
       id UUID PRIMARY KEY,
@@ -583,7 +604,7 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
   await sql`CREATE INDEX IF NOT EXISTS petcare_social_posts_created_idx ON petcare_social_posts (created_at DESC)`;
 }
 
-async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput, metadata: CaptureMetadata = {}) {
+async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput, metadata: CaptureMetadata = {}): Promise<string> {
   const createdAt = metadata.createdAt && Number.isFinite(Date.parse(metadata.createdAt))
     ? new Date(metadata.createdAt).toISOString()
     : new Date().toISOString();
@@ -599,7 +620,7 @@ async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput
     : now;
   if (metadata.externalId) {
     const existing = await sql`SELECT id FROM petcare_leads WHERE external_id = ${metadata.externalId} LIMIT 1`;
-    if (existing.length > 0) return;
+    if (existing.length > 0) return String(existing[0].id);
   }
   const contactId = crypto.randomUUID();
   const messageId = crypto.randomUUID();
@@ -673,13 +694,17 @@ async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput
       ON CONFLICT DO NOTHING
     `,
     sql`
-      INSERT INTO petcare_leads (id, external_id, contact_id, type, status, channel, service, pet, total, items, details, created_at)
+      INSERT INTO petcare_leads (
+        id, external_id, contact_id, type, status, channel, service, pet, total, items, details, appointment_slot_id, created_at
+      )
       SELECT ${leadId}, ${metadata.externalId ?? null}, id, ${input.type}, ${leadStatus}, ${input.channel}, ${input.service ?? null},
-        ${input.pet ?? null}, ${input.total ?? null}, ${JSON.stringify(input.items)}, ${input.message}, ${now}
+        ${input.pet ?? null}, ${input.total ?? null}, ${JSON.stringify(input.items)}, ${input.message},
+        ${metadata.appointmentSlotId ?? null}::uuid, ${now}
       FROM petcare_contacts WHERE email = ${input.email}
       ON CONFLICT DO NOTHING
     `,
   ]);
+  return leadId;
 }
 
 async function parseJsonBody(request: Request) {
@@ -952,6 +977,97 @@ export default {
       }
     }
 
+    if (action === "contact") {
+      const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
+      if (isCaptureRateLimited(ip)) {
+        return response({ error: "Recibimos muchas consultas desde tu conexión. Inténtalo nuevamente en unos minutos." }, 429, origin);
+      }
+      const contentLength = Number(request.headers.get("Content-Length") ?? 0);
+      if (contentLength > 8192) return response({ error: "El mensaje es demasiado grande." }, 413, origin);
+      const body = await parseJsonBody(request);
+      const firstname = text(body?.firstname, 100);
+      const lastname = text(body?.lastname, 100);
+      const email = text(body?.email, 254).toLowerCase();
+      const phone = text(body?.phone, 32).replace(/\D/g, "");
+      const subject = text(body?.subject, 200) || "Consulta desde la página de contacto";
+      const message = text(body?.message, 3000);
+      if (
+        firstname.length < 2 ||
+        lastname.length < 2 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ||
+        !/^(9\d{8}|0?1\d{7})$/.test(phone) ||
+        message.length < 5 ||
+        body?.consent !== true
+      ) {
+        return response({ error: "Revisa tus datos, el mensaje y la autorización para tratar tus datos." }, 400, origin);
+      }
+
+      try {
+        await ensureSchema(sql);
+        const now = new Date().toISOString();
+        const marketingConsent = body.marketingConsent === true;
+        await sql.transaction([
+          sql`
+            INSERT INTO petcare_contacts (
+              id, firstname, lastname, email, phone, source, lifecycle, lifecycle_updated_at,
+              lifecycle_reason, engagement_count, order_request_count, marketing_consent,
+              marketing_consent_at, marketing_consent_source, created_at, last_seen_at
+            ) VALUES (
+              ${crypto.randomUUID()}::uuid, ${firstname}, ${lastname}, ${email}, ${phone},
+              'contact_form', 'lead', ${now}, 'Consulta recibida desde el formulario de contacto',
+              1, 0, ${marketingConsent}, ${marketingConsent ? now : null},
+              ${marketingConsent ? "contact_form" : null}, ${now}, ${now}
+            )
+            ON CONFLICT (email) DO UPDATE SET
+              firstname = EXCLUDED.firstname,
+              lastname = EXCLUDED.lastname,
+              phone = EXCLUDED.phone,
+              source = 'contact_form',
+              lifecycle = CASE
+                WHEN petcare_contacts.lifecycle = 'visitante' THEN 'lead'
+                ELSE petcare_contacts.lifecycle
+              END,
+              lifecycle_updated_at = CASE
+                WHEN petcare_contacts.lifecycle = 'visitante' THEN EXCLUDED.lifecycle_updated_at
+                ELSE petcare_contacts.lifecycle_updated_at
+              END,
+              lifecycle_reason = CASE
+                WHEN petcare_contacts.lifecycle = 'visitante' THEN EXCLUDED.lifecycle_reason
+                ELSE petcare_contacts.lifecycle_reason
+              END,
+              engagement_count = petcare_contacts.engagement_count + 1,
+              marketing_consent = petcare_contacts.marketing_consent OR EXCLUDED.marketing_consent,
+              marketing_unsubscribed_at = CASE
+                WHEN EXCLUDED.marketing_consent THEN NULL
+                ELSE petcare_contacts.marketing_unsubscribed_at
+              END,
+              marketing_consent_at = CASE
+                WHEN EXCLUDED.marketing_consent AND (
+                  NOT petcare_contacts.marketing_consent OR petcare_contacts.marketing_unsubscribed_at IS NOT NULL
+                ) THEN EXCLUDED.marketing_consent_at
+                ELSE petcare_contacts.marketing_consent_at
+              END,
+              marketing_consent_source = CASE
+                WHEN EXCLUDED.marketing_consent AND (
+                  NOT petcare_contacts.marketing_consent OR petcare_contacts.marketing_unsubscribed_at IS NOT NULL
+                ) THEN EXCLUDED.marketing_consent_source
+                ELSE petcare_contacts.marketing_consent_source
+              END,
+              last_seen_at = EXCLUDED.last_seen_at
+          `,
+          sql`
+            INSERT INTO petcare_messages (id, contact_id, subject, body, source, channel, status, created_at)
+            SELECT ${crypto.randomUUID()}::uuid, id, ${subject}, ${message}, 'contact_form', 'form', 'nuevo', ${now}
+            FROM petcare_contacts WHERE email = ${email}
+          `,
+        ]);
+        return response({ ok: true }, 201, origin);
+      } catch (error) {
+        console.error("No se pudo guardar el mensaje del formulario de contacto", error);
+        return response({ error: "No pudimos guardar tu mensaje. Inténtalo nuevamente." }, 503, origin);
+      }
+    }
+
     if (action === "login") {
       const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
       if (isRateLimited(ip)) return response({ error: "Demasiados intentos. Prueba nuevamente en 15 minutos." }, 429, origin);
@@ -1090,23 +1206,6 @@ export default {
       }
     }
 
-    if (action === "capture") {
-      const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anon";
-      if (isCaptureRateLimited(ip)) return response({ error: "Demasiadas solicitudes. Intenta más tarde." }, 429, origin);
-      const input = validateCapture(await parseJsonBody(request));
-      if (!input || input.type !== "appointment") {
-        return response({ error: "Solo se aceptan solicitudes de cita públicas; inicia sesión para enviar un pedido." }, 400, origin);
-      }
-      try {
-        await ensureSchema(sql);
-        await capture(sql, input);
-        return response({ ok: true }, 201, origin);
-      } catch (error) {
-        console.error("No se pudo guardar la solicitud CRM", error);
-        return response({ error: "No pudimos registrar la solicitud. Inténtalo nuevamente." }, 503, origin);
-      }
-    }
-
     const authorization = request.headers.get("Authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
     const session = token ? readSession(token, config.secret) : null;
@@ -1186,12 +1285,48 @@ export default {
     }
 
     const permissions = activeSession.role === "customer" ? null : STAFF_PERMISSIONS[activeSession.role];
-    if (!permissions?.has(action)) {
+    const customerAppointmentAction = activeSession.role === "customer" &&
+      ["appointment-slots", "my-appointments", "book-appointment"].includes(action);
+    if (!customerAppointmentAction && !permissions?.has(action)) {
       return response({ error: "Tu rol no tiene acceso a esta sección." }, 403, origin);
     }
 
     try {
       await ensureSchema(sql);
+      if (action === "appointment-slots") {
+        const slots = await sql`
+          SELECT s.id, s.starts_at AS "startsAt", s.ends_at AS "endsAt", s.status,
+            s.veterinarian_id AS "veterinarianId",
+            concat_ws(' ', v.firstname, v.lastname) AS "veterinarianName"
+          FROM petcare_appointment_slots s
+          JOIN petcare_users v ON v.id = s.veterinarian_id
+          WHERE s.starts_at >= now()
+            AND s.starts_at < now() + interval '90 days'
+            AND s.status <> 'cancelled'
+            AND (${activeSession.role !== "veterinarian"} OR s.veterinarian_id = ${activeSession.id}::uuid)
+            AND (${activeSession.role !== "customer"} OR s.status = 'available')
+          ORDER BY s.starts_at
+          LIMIT 300
+        `;
+        return response({ slots }, 200, origin);
+      }
+      if (action === "my-appointments") {
+        if (activeSession.role !== "customer") return response({ error: "Solo los clientes pueden ver sus citas." }, 403, origin);
+        const appointments = await sql`
+          SELECT l.id, l.status, l.service, l.pet, l.created_at AS "createdAt",
+            s.starts_at AS "scheduledAt", s.ends_at AS "endsAt",
+            concat_ws(' ', v.firstname, v.lastname) AS "veterinarianName",
+            l.appointment_price AS price
+          FROM petcare_leads l
+          JOIN petcare_contacts c ON c.id = l.contact_id AND c.account_id = ${activeSession.id}::uuid
+          LEFT JOIN petcare_appointment_slots s ON s.id = l.appointment_slot_id
+          LEFT JOIN petcare_users v ON v.id = s.veterinarian_id
+          WHERE l.type = 'appointment'
+          ORDER BY s.starts_at DESC NULLS LAST, l.created_at DESC
+          LIMIT 100
+        `;
+        return response({ appointments }, 200, origin);
+      }
       if (action === "social-upload") {
         if (request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !== "image/jpeg") {
           return response({ error: "Solo se aceptan imágenes JPEG." }, 415, origin);
@@ -1210,6 +1345,126 @@ export default {
       }
 
       const body = await parseJsonBody(request);
+      if (action === "book-appointment") {
+        if (activeSession.role !== "customer") return response({ error: "Inicia sesión con tu cuenta de cliente para reservar." }, 403, origin);
+        const slotId = text(body?.slotId, 36);
+        const service = text(body?.service, 200);
+        const pet = text(body?.pet, 200);
+        const phone = text(body?.phone, 32).replace(/\D/g, "");
+        const details = text(body?.details, 3000);
+        if (
+          !UUID_PATTERN.test(slotId) || !service || !pet ||
+          !/^(9\d{8}|0?1\d{7})$/.test(phone) || body?.consent !== true
+        ) {
+          return response({ error: "Revisa el servicio, la mascota, el teléfono y la autorización de datos." }, 400, origin);
+        }
+
+        const reserved = await sql`
+          UPDATE petcare_appointment_slots SET status = 'reserved'
+          WHERE id = ${slotId}::uuid AND status = 'available' AND starts_at > now()
+          RETURNING id
+        `;
+        if (!reserved.length) return response({ error: "Ese horario ya no está disponible. Elige otro cupo." }, 409, origin);
+
+        const detailsText = [
+          `Servicio: ${service}`,
+          `Mascota: ${pet}`,
+          details,
+        ].filter(Boolean).join("\n");
+        const input: ContactInput = {
+          firstname: activeSession.firstname,
+          lastname: activeSession.lastname || activeSession.firstname,
+          email: activeSession.sub,
+          phone,
+          source: "contact_form",
+          subject: `Solicitud de cita: ${service}`,
+          message: detailsText,
+          channel: "form",
+          marketingConsent: body?.marketingConsent === true,
+          service,
+          pet,
+          type: "appointment",
+        };
+        try {
+          await sql`UPDATE petcare_users SET phone = ${phone} WHERE id = ${activeSession.id}::uuid`;
+          const appointmentId = await capture(sql, input, {
+            accountId: activeSession.id,
+            appointmentSlotId: slotId,
+          });
+          return response({ ok: true, appointmentId }, 201, origin);
+        } catch (error) {
+          try {
+            await sql`
+              UPDATE petcare_appointment_slots SET status = 'available'
+              WHERE id = ${slotId}::uuid AND status = 'reserved'
+            `;
+          } catch (rollbackError) {
+            console.error("No se pudo liberar el horario tras fallar la reserva", rollbackError);
+          }
+          throw error;
+        }
+      }
+      if (action === "appointment-slot-create") {
+        if (activeSession.role !== "admin" && activeSession.role !== "veterinarian") {
+          return response({ error: "Solo administración y veterinarios pueden publicar horarios." }, 403, origin);
+        }
+        const startsAt = text(body?.startsAt, 40);
+        const endsAt = text(body?.endsAt, 40);
+        const start = Date.parse(startsAt);
+        const end = Date.parse(endsAt);
+        const duration = end - start;
+        if (
+          !Number.isFinite(start) || !Number.isFinite(end) || start <= Date.now() ||
+          start > Date.now() + 90 * 24 * 60 * 60 * 1000 ||
+          duration < 15 * 60 * 1000 || duration > 4 * 60 * 60 * 1000
+        ) {
+          return response({ error: "El horario debe durar entre 15 minutos y 4 horas, dentro de los próximos 90 días." }, 400, origin);
+        }
+        const veterinarianId = activeSession.role === "veterinarian" ? activeSession.id : text(body?.veterinarianId, 36);
+        if (!UUID_PATTERN.test(veterinarianId)) return response({ error: "Elige un veterinario válido." }, 400, origin);
+        const veterinarian = await sql`
+          SELECT id FROM petcare_users WHERE id = ${veterinarianId}::uuid AND role = 'veterinarian' LIMIT 1
+        `;
+        if (!veterinarian.length) return response({ error: "No se encontró la cuenta del veterinario." }, 404, origin);
+        const createdBy = UUID_PATTERN.test(activeSession.id) ? activeSession.id : null;
+        const inserted = await sql`
+          WITH vet_lock AS (
+            SELECT pg_advisory_xact_lock(hashtextextended(${veterinarianId}, 0))
+          ),
+          new_slot AS (
+            INSERT INTO petcare_appointment_slots (id, veterinarian_id, starts_at, ends_at, created_by_id)
+            SELECT ${crypto.randomUUID()}::uuid, ${veterinarianId}::uuid,
+              ${new Date(start).toISOString()}, ${new Date(end).toISOString()}, ${createdBy}::uuid
+            FROM vet_lock
+            WHERE NOT EXISTS (
+              SELECT 1 FROM petcare_appointment_slots
+              WHERE veterinarian_id = ${veterinarianId}::uuid
+                AND status <> 'cancelled'
+                AND starts_at < ${new Date(end).toISOString()}
+                AND ends_at > ${new Date(start).toISOString()}
+            )
+            RETURNING id
+          )
+          SELECT id FROM new_slot
+        `;
+        if (!inserted.length) return response({ error: "El veterinario ya tiene un horario que se cruza con ese cupo." }, 409, origin);
+        return response({ id: String(inserted[0].id) }, 201, origin);
+      }
+      if (action === "appointment-slot-cancel") {
+        if (activeSession.role !== "admin" && activeSession.role !== "veterinarian") {
+          return response({ error: "Solo administración y veterinarios pueden cambiar la disponibilidad." }, 403, origin);
+        }
+        const slotId = text(body?.id, 36);
+        if (!UUID_PATTERN.test(slotId)) return response({ error: "Horario inválido." }, 400, origin);
+        const cancelled = await sql`
+          UPDATE petcare_appointment_slots SET status = 'cancelled'
+          WHERE id = ${slotId}::uuid AND status = 'available' AND starts_at > now()
+            AND (${activeSession.role === "admin"} OR veterinarian_id = ${activeSession.id}::uuid)
+          RETURNING id
+        `;
+        if (!cancelled.length) return response({ error: "Solo se pueden quitar horarios disponibles y futuros." }, 409, origin);
+        return response({ ok: true }, 200, origin);
+      }
       if (action === "social-status") {
         const state = text(body?.state, 200);
         const stateHash = state ? createHash("sha256").update(state).digest("hex") : "";
@@ -1491,8 +1746,13 @@ export default {
           SELECT l.id, l.contact_id AS "contactId",
             concat_ws(' ', c.firstname, c.lastname) AS owner, c.email, c.phone,
             l.type, l.status, l.channel, l.service, l.pet, l.details, l.created_at AS "createdAt",
+            l.appointment_slot_id AS "slotId", s.starts_at AS "scheduledAt", s.ends_at AS "endsAt",
+            concat_ws(' ', v.firstname, v.lastname) AS "veterinarianName",
+            l.appointment_price AS price,
             r.id AS "recordId", r.pet_id AS "recordPetId"
           FROM petcare_leads l JOIN petcare_contacts c ON c.id = l.contact_id
+          LEFT JOIN petcare_appointment_slots s ON s.id = l.appointment_slot_id
+          LEFT JOIN petcare_users v ON v.id = s.veterinarian_id
           LEFT JOIN LATERAL (
             SELECT id, pet_id FROM petcare_clinical_records
             WHERE appointment_id = l.id ORDER BY created_at DESC LIMIT 1
@@ -1687,12 +1947,26 @@ export default {
         const id = text(body?.id, 64);
         const status = text(body?.status, 24);
         if (!id || !["new", "contacted", "qualified", "closed"].includes(status)) return response({ error: "Estado de cita inválido." }, 400, origin);
+        if (status === "qualified" && activeSession.role === "veterinarian") {
+          return response({ error: "Solo ventas o administración pueden confirmar una cita." }, 403, origin);
+        }
+        const price = typeof body?.price === "number" && Number.isFinite(body.price) && body.price >= 0 && body.price <= 100000
+          ? body.price
+          : null;
+        if (status === "qualified" && price === null) return response({ error: "Indica el costo antes de confirmar la cita." }, 400, origin);
         const updated = await sql`
-          UPDATE petcare_leads SET status = ${status}
+          UPDATE petcare_leads
+          SET status = ${status}, appointment_price = COALESCE(${price}, appointment_price)
           WHERE id = ${id}::uuid AND type = 'appointment'
-          RETURNING id
+          RETURNING id, appointment_slot_id AS "slotId"
         `;
         if (!updated.length) return response({ error: "No se encontró la cita." }, 404, origin);
+        if (updated[0].slotId) {
+          await sql`
+            UPDATE petcare_appointment_slots SET status = ${status === "qualified" || status === "closed" ? "booked" : "reserved"}
+            WHERE id = ${updated[0].slotId}::uuid
+          `;
+        }
         return response({ ok: true }, 200, origin);
       }
       if (action === "read") {

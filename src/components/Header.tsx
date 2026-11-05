@@ -14,6 +14,7 @@ const nav = [
   { to: "/", label: "Inicio" },
   { to: "/tienda", label: "Tienda" },
   { to: "/servicios", label: "Servicios" },
+  { to: "/citas", label: "Citas" },
   { to: "/nosotros", label: "Nosotros" },
   { to: "/contacto", label: "Contacto" },
 ];
@@ -81,7 +82,7 @@ export function Header() {
               )}
             </Button>
             <span aria-hidden="true" className="mx-2 hidden h-6 w-px bg-border sm:block" />
-            <ButtonLink to="/contacto" size="sm" className="hidden sm:inline-flex">
+            <ButtonLink to="/citas" size="sm" className="hidden sm:inline-flex">
               Agendar cita
             </ButtonLink>
             <Button

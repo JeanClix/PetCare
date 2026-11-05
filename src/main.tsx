@@ -7,9 +7,11 @@ import { CartProvider } from "@/context/CartContext";
 import { About } from "@/pages/About";
 import { Account } from "@/pages/Account";
 import { Admin } from "@/pages/Admin";
+import { AppointmentBooking } from "@/pages/AppointmentBooking";
 import { Contact } from "@/pages/Contact";
 import { Home } from "@/pages/Home";
 import { NotFound } from "@/pages/NotFound";
+import { ProductDetail } from "@/pages/ProductDetail";
 import { Services } from "@/pages/Services";
 import { Shop } from "@/pages/Shop";
 import "./index.css";
@@ -24,9 +26,11 @@ const router = createHashRouter([
     children: [
       { path: "/", element: <Home /> },
       { path: "/tienda", element: <Shop /> },
+      { path: "/tienda/:productId", element: <ProductDetail /> },
       { path: "/servicios", element: <Services /> },
       { path: "/nosotros", element: <About /> },
       { path: "/contacto", element: <Contact /> },
+      { path: "/citas", element: <AppointmentBooking /> },
       { path: "/cuenta", element: <Account /> },
       { path: "*", element: <NotFound /> },
     ],

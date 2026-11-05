@@ -190,7 +190,7 @@ function MessageBubble({ message }: { message: Message }) {
         </ul>
       )}
       {service && (
-        <ButtonLink to={`/contacto?servicio=${service.id}`} variant="outline" size="sm">
+        <ButtonLink to={`/citas?servicio=${service.id}`} variant="outline" size="sm">
           Agendar cita: {service.name}
         </ButtonLink>
       )}

@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { isDevelopmentAdminAuth, isStaffRole } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
+import { CustomerAppointments } from "@/pages/clinic/CustomerAppointments";
 
 type Mode = "login" | "register";
 
@@ -23,6 +24,7 @@ export function Account() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const next = searchParams.get("next");
+  const nextService = searchParams.get("servicio");
 
   useEffect(() => {
     if (!ready || !user) return;
@@ -31,8 +33,11 @@ export function Account() {
     } else if (next === "/checkout") {
       navigate("/tienda", { replace: true, state: { checkoutAfterLogin: true } });
       openCart();
+    } else if (next === "/citas") {
+      const service = nextService ? `?servicio=${encodeURIComponent(nextService)}` : "";
+      navigate(`/citas${service}`, { replace: true });
     }
-  }, [ready, user, next, navigate, openCart]);
+  }, [ready, user, next, nextService, navigate, openCart]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,8 +69,9 @@ export function Account() {
     return (
       <>
         <PageHeader title="Mi cuenta" description="Tu sesión de cliente está activa." />
-        <Container className="py-14 sm:py-20">
-          <section className="mx-auto max-w-xl space-y-6 rounded-media border border-border bg-card p-6 shadow-soft sm:p-9">
+        <Container className="py-10 sm:py-14">
+          <div className="mx-auto max-w-3xl space-y-5">
+          <section className="space-y-5 rounded-media border border-border bg-card p-6 shadow-soft sm:p-8">
             <div className="flex items-center gap-4">
               <UserCirclePlus weight="duotone" className="size-12 text-accent" />
               <div>
@@ -74,13 +80,16 @@ export function Account() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Inicia sesión para finalizar pedidos. El equipo de PetCare coordina el pago y la entrega por WhatsApp.
+              Administra tus pedidos y consulta el estado de tus citas desde tu cuenta.
             </p>
             <div className="flex flex-wrap gap-3">
-              <ButtonLink to="/tienda" onClick={openCart}>Ir a la tienda</ButtonLink>
+              <ButtonLink to="/tienda" onClick={openCart}>Ver tienda</ButtonLink>
+              <ButtonLink to="/citas" variant="outline">Agendar cita</ButtonLink>
               <Button variant="outline" onClick={() => { logout(); navigate("/", { replace: true }); }}>Cerrar sesión</Button>
             </div>
           </section>
+          <CustomerAppointments token={user.token} />
+          </div>
         </Container>
       </>
     );
@@ -94,7 +103,9 @@ export function Account() {
             {mode === "login" ? "Inicia sesión" : "Crea tu cuenta"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {mode === "login" ? "Entra para hacer pedidos y ver tu cuenta." : "Regístrate para hacer pedidos en la tienda."}
+            {next === "/citas"
+              ? "Inicia sesión o crea tu cuenta para reservar y seguir tu cita."
+              : mode === "login" ? "Entra para hacer pedidos y ver tu cuenta." : "Regístrate para hacer pedidos en la tienda."}
           </p>
         </div>
         <div className="flex rounded-full bg-muted p-1" role="tablist" aria-label="Acceso a PetCare">
