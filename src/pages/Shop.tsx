@@ -70,9 +70,17 @@ export function Shop() {
         description="Alimentos, farmacia, higiene y accesorios para perros, gatos y exóticos, recomendados por nuestros médicos."
       />
 
-      <Container className="py-10">
-        <div className="z-20 mb-10 space-y-4 rounded-media bg-card p-4 shadow-soft sm:p-5 lg:sticky lg:top-[7.5rem]">
-          <div className="flex flex-col gap-3 sm:flex-row">
+      <Container className="py-8 sm:py-10">
+        <div className="z-20 mb-7 rounded-card border border-border bg-card p-4 shadow-soft sm:p-5 lg:sticky lg:top-[7.5rem]">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-black text-primary">Encuentra lo que necesitas</h2>
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })}>
+                <X weight="bold" /> Limpiar
+              </Button>
+            )}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
             <label className="relative flex-1">
               <span className="sr-only">Buscar productos</span>
               <MagnifyingGlass weight="bold" className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -80,16 +88,16 @@ export function Shop() {
                 type="search"
                 value={query}
                 onChange={(e) => update("q", e.target.value, "")}
-                placeholder="Buscar: shampoo, Hill's, oftálmico…"
+                placeholder="Buscar productos"
                 className="h-12 w-full rounded-full border-2 border-border bg-background pr-4 pl-11 text-[0.95rem] placeholder:text-muted-foreground/80 focus:border-accent focus:outline-none"
               />
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              <span className="shrink-0 text-muted-foreground">Ordenar</span>
+            <label className="flex min-w-0 items-center gap-2 text-sm">
+              <span className="shrink-0 text-muted-foreground">Ordenar:</span>
               <select
                 value={sort}
                 onChange={(e) => update("orden", e.target.value, "recientes")}
-                className="h-12 w-full rounded-full border-2 border-border bg-background px-4 text-[0.95rem] focus:border-accent focus:outline-none sm:w-auto"
+                className="h-12 min-w-0 flex-1 rounded-full border-2 border-border bg-background px-4 text-[0.95rem] focus:border-accent focus:outline-none sm:w-auto sm:flex-none"
               >
                 {Object.entries(sortLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -100,7 +108,7 @@ export function Shop() {
             </label>
           </div>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:gap-8">
+          <div className="grid gap-4 border-t border-border pt-4">
             <ChipGroup
               label="Mascota"
               value={pet}
@@ -121,25 +129,18 @@ export function Shop() {
             <span className="font-semibold text-foreground">{results.length}</span>{" "}
             {results.length === 1 ? "producto" : "productos"}
           </p>
-          {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })}>
-              <X weight="bold" /> Limpiar filtros
-            </Button>
-          )}
         </div>
 
         {results.length > 0 ? (
-          <div className="grid grid-cols-2 gap-x-5 gap-y-9 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 sm:gap-y-9 md:grid-cols-3 lg:grid-cols-4">
             {results.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
           </div>
         ) : (
           <div className="rounded-media bg-sky/60 px-6 py-16 text-center">
-            <p className="font-display text-xl font-black">No encontramos productos con esos filtros</p>
-            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
-              Tenemos más productos en la tienda de Surco. Llámanos al {business.phone} y te confirmamos si lo tenemos.
-            </p>
+            <p className="font-display text-xl font-black">No encontramos productos</p>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">Prueba con otros filtros o consúltanos al {business.phone}.</p>
             <Button variant="outline" size="sm" className="mt-6" onClick={() => setParams({}, { replace: true })}>
               Ver todos los productos
             </Button>
@@ -162,19 +163,19 @@ function ChipGroup<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="w-20 shrink-0 text-sm font-bold text-muted-foreground">{label}</span>
-      <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+    <div className="grid min-w-0 gap-2 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+      <span className="text-sm font-bold text-muted-foreground">{label}</span>
+      <div role="group" aria-label={label} className="flex flex-wrap gap-2">
         {(Object.entries(options) as [T, string][]).map(([key, text]) => (
           <button
             key={key}
             onClick={() => onChange(key)}
             aria-pressed={value === key}
             className={cn(
-              "shrink-0 rounded-full px-4 py-1.5 font-display text-sm font-bold transition-colors",
+              "rounded-full border px-3.5 py-1.5 font-display text-sm font-bold transition-colors sm:px-4",
               value === key
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-foreground hover:bg-accent-soft hover:text-accent",
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background text-foreground hover:border-accent hover:bg-accent-soft hover:text-accent",
             )}
           >
             {text}

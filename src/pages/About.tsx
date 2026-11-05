@@ -16,21 +16,16 @@ export function About() {
   return (
     <>
       <PageHeader
-        title={`${yearsOfExperience} años haciendo lo que nos gusta`}
-        description="Una clínica veterinaria de Surco que nació de la experiencia en la distribución de productos veterinarios."
+        title={`${yearsOfExperience} años cuidando mascotas`}
+        description="PetCare nació en Surco para ofrecer atención veterinaria cercana y confiable."
       />
 
-      <Container className="grid items-center gap-14 py-20 sm:py-28 lg:grid-cols-[1fr_1.05fr]">
-        <div className="reveal space-y-5 text-lg leading-relaxed text-muted-foreground">
+      <Container className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[1fr_1.05fr]">
+        <div className="reveal space-y-4 leading-relaxed text-muted-foreground">
           <SectionHeading title={`Desde el ${business.foundedDate}`} />
           <p>
-            Dimos nuestros primeros pasos en una empresa distribuidora de productos veterinarios, y allí nació la idea
-            de ofrecer nuestros propios servicios. Así comenzó PetCare.
-          </p>
-          <p>
-            No fue fácil al inicio, pero no hay nada mejor que trabajar en lo que te gusta, para lo que te has formado
-            y te da satisfacción. Hoy contamos con colaboradores que son un gran apoyo, y con clientes y pacientes a
-            los que les tenemos mucho cariño.
+            Empezamos distribuyendo productos veterinarios y crecimos hasta convertirnos en una clínica dedicada al
+            bienestar de cada paciente.
           </p>
         </div>
         <div className="reveal relative pb-8">
@@ -46,23 +41,23 @@ export function About() {
         </div>
       </Container>
 
-      <section className="border-y border-border bg-card py-20 sm:py-24">
-        <Container className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
+      <section className="border-y border-border bg-card py-14 sm:py-16">
+        <Container className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <SectionHeading title="Lo que nos mueve" className="reveal" />
-          <dl className="grid gap-x-10 gap-y-9 sm:grid-cols-2">
+          <dl className="grid gap-x-10 gap-y-7 sm:grid-cols-2">
             {values.map(({ icon: Icon, title, text }) => (
               <div key={title} className="reveal">
                 <dt className="flex items-center gap-3 font-display text-xl font-black">
                   <Icon weight="duotone" className="size-8 text-accent" /> {title}
                 </dt>
-                <dd className="mt-2 text-muted-foreground">{text}</dd>
+                <dd className="mt-2 text-sm text-muted-foreground">{text}</dd>
               </div>
             ))}
           </dl>
         </Container>
       </section>
 
-      <div className="pt-20 sm:pt-28">
+      <div className="pt-14 sm:pt-16">
         <VisitUs />
       </div>
     </>

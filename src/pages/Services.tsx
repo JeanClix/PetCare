@@ -25,9 +25,9 @@ export function Services() {
   return (
     <>
       <PageHeader
-        title="Consultas veterinarias, grooming y microchip en Surco"
-        description="Médicos veterinarios titulados y colegiados, equipos de última generación y servicios para perros, gatos y exóticos en Surco, Lima."
-        image={{ src: photos.bath, alt: "Golden retriever durante el baño" }}
+        title="Servicios veterinarios en Surco"
+        description="Atención médica, grooming y más para perros, gatos y mascotas exóticas."
+        image={{ src: photos.puppy, alt: "Cachorro golden en el pasto" }}
       >
         <nav className="mt-7 flex flex-wrap gap-2" aria-label="Servicios">
           {services.map((s) => (
@@ -42,7 +42,7 @@ export function Services() {
         </nav>
       </PageHeader>
 
-      <Container className="space-y-5 py-14 sm:py-20">
+      <Container className="space-y-5 py-10 sm:py-14">
         <FeaturedService service={featured[0]} image={photos.puppy} imageAlt="Cachorro golden corriendo en el pasto" />
 
         <div className="grid gap-5 md:grid-cols-2">
@@ -71,15 +71,15 @@ export function Services() {
         <FeaturedService service={featured[1]} image={photos.corgi} imageAlt="Corgi mirando a la cámara" reverse />
       </Container>
 
-      <section className="border-y border-border bg-card py-20 sm:py-24">
+      <section className="border-y border-border bg-card py-14 sm:py-16">
         <Container>
           <SectionHeading
             eyebrow="Tranquilo, podemos ayudarte"
             title="Así preparamos el viaje de tu mascota"
-            description="Es seguro y fácil transportar a tu engreído dentro y fuera del país. Déjalo en manos de expertos."
+            description="Te guiamos con los requisitos y documentos para viajar con tu mascota."
             className="reveal"
           />
-          <ol className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          <ol className="mt-8 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
             {travelSteps.map(({ icon: Icon, title, text }) => (
               <li key={title} className="reveal border-t-2 border-accent pt-5">
                 <Icon weight="duotone" className="size-8 text-accent" />
@@ -91,7 +91,7 @@ export function Services() {
         </Container>
       </section>
 
-      <div className="pt-20 sm:pt-28">
+      <div className="pt-14 sm:pt-16">
         <VisitUs />
       </div>
     </>
@@ -115,8 +115,8 @@ function FeaturedService({
       <div className="p-7 sm:p-10">
         <ServiceIcon name={s.icon} className="size-10 text-accent" />
         <h2 className="mt-4 text-3xl font-black">{s.name}</h2>
-        <p className="mt-2 max-w-[56ch] text-muted-foreground">{s.description}</p>
-        <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+        <p className="mt-2 max-w-[56ch] text-muted-foreground">{s.summary}</p>
+        <ul className="mt-5 grid gap-2.5 sm:grid-cols-2">
           {s.bullets!.map((b) => (
             <li key={b} className="flex gap-2.5 text-[0.95rem] font-semibold">
               <Check weight="bold" className="mt-0.5 size-5 shrink-0 text-accent" />
@@ -124,7 +124,7 @@ function FeaturedService({
             </li>
           ))}
         </ul>
-        <ButtonLink to={`/contacto?servicio=${s.id}`} className="mt-8">
+        <ButtonLink to={`/contacto?servicio=${s.id}`} className="mt-6">
           Agendar cita
         </ButtonLink>
       </div>

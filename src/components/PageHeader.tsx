@@ -14,11 +14,11 @@ export function PageHeader({
 }) {
   return (
     <section className="border-b border-border bg-sky/60">
-      <Container className="grid items-end gap-8 pt-12 pb-10 sm:pt-16 md:grid-cols-[1fr_auto]">
+      <Container className="grid items-end gap-6 pt-10 pb-8 sm:pt-12 sm:pb-10 md:grid-cols-[1fr_auto]">
         <div className="animate-fade-up">
           <h1 className="max-w-3xl text-4xl leading-[1.05] font-black text-primary sm:text-5xl">{title}</h1>
           {description && (
-            <p className="mt-4 max-w-[56ch] text-lg leading-relaxed text-muted-foreground">{description}</p>
+            <p className="mt-3 max-w-[56ch] text-base leading-relaxed text-muted-foreground sm:text-lg">{description}</p>
           )}
           {children}
         </div>
@@ -26,7 +26,7 @@ export function PageHeader({
           <img
             src={image.src}
             alt={image.alt}
-            className="hidden aspect-[4/3] w-72 rounded-media object-cover shadow-soft md:block lg:w-80"
+            className="hidden aspect-[4/3] w-64 rounded-media object-cover shadow-soft md:block lg:w-72"
           />
         )}
       </Container>

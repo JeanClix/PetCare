@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Modo oscuro por clase (.dark en <html>), inicializado según el sistema en index.html */
+/* Modo oscuro por clase (.dark en <html>), según la preferencia guardada */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*

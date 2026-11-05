@@ -44,14 +44,14 @@ function Hero() {
     <section className="overflow-hidden">
       <Container className="grid items-center gap-12 pt-10 pb-16 sm:pt-14 lg:grid-cols-[1.15fr_1fr] lg:gap-10 lg:pt-16 lg:pb-20">
         <div className="animate-fade-up">
-          <p className="mb-4 font-display text-base font-extrabold text-accent italic">
-            Clínica veterinaria en Surco desde {business.foundedYear}
+          <p className="mb-3 font-display text-base font-extrabold text-accent italic">
+            Clínica veterinaria en Surco
           </p>
           <h1 className="text-[2.6rem] leading-[1.02] font-black tracking-[-0.035em] text-primary sm:text-6xl lg:text-[3.5rem] xl:text-[3.75rem]">
-            Clínica veterinaria en Surco para <em className="pr-1 text-accent">perros, gatos y exóticos</em>
+            Cuidamos a tu mascota en cada etapa
           </h1>
-          <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-muted-foreground sm:text-xl">
-            Consultas veterinarias, grooming para perros y gatos, vacunas, cirugías, microchip y farmacia en Surco, Lima, con médicos colegiados y atención a domicilio.
+          <p className="mt-5 max-w-[42ch] text-lg leading-relaxed text-muted-foreground sm:text-xl">
+            Consultas, grooming y farmacia para perros, gatos y mascotas exóticas.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4">
             <ButtonLink to="/contacto" size="lg">
@@ -95,10 +95,10 @@ function Hero() {
 
 function Highlights() {
   const items = [
-    { value: `${yearsOfExperience} años`, label: `Cuidando mascotas desde el ${business.foundedDate}` },
-    { value: "10 servicios", label: "De la vacuna anual a la cirugía, con el mismo equipo" },
-    { value: "Con cámaras", label: "Mira a tu mascota durante el baño y el grooming" },
-    { value: "A domicilio", label: "Consultas en casa para mascotas que se estresan al salir" },
+    { value: `${yearsOfExperience} años`, label: "Cuidando mascotas en Surco" },
+    { value: "10 servicios", label: "Salud, grooming y más" },
+    { value: "Con cámaras", label: "Seguimiento durante el grooming" },
+    { value: "A domicilio", label: "Consultas sin salir de casa" },
   ];
   return (
     <section className="border-y border-border bg-card">
@@ -126,7 +126,7 @@ function ServicesBento() {
   const consultas = byId("consultas");
   const grooming = byId("grooming");
   return (
-    <section className="py-20 sm:py-28">
+    <section className="py-14 sm:py-16">
       <Container>
         <div className="reveal flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <SectionHeading title="Todo lo que necesita, en un solo lugar" />
@@ -142,7 +142,7 @@ function ServicesBento() {
             <div className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-navy-deep via-brand-navy-deep/85 via-55% to-brand-navy-deep/10 sm:from-brand-navy-deep/95 sm:via-brand-navy-deep/45 sm:via-45% sm:to-transparent sm:to-75%" />
             <ServiceIcon name={consultas.icon} className="mb-3 size-9 text-[#6fe0c4]" />
             <h3 className="text-3xl font-black">{consultas.name}</h3>
-            <p className="mt-2 max-w-md text-white/85">{consultas.description}</p>
+            <p className="mt-2 max-w-md text-white/85">{consultas.summary}</p>
             <ul className="mt-4 flex flex-wrap gap-2 text-sm font-semibold">
               {consultas.bullets!.slice(0, 4).map((b) => (
                 <li key={b} className="rounded-full bg-white/15 px-3 py-1 backdrop-blur">{b}</li>
@@ -189,7 +189,7 @@ function SmallService({ id, className }: { id: string; className?: string }) {
 function TravelFeature() {
   const travel = byId("viajes");
   return (
-    <section className="pb-20 sm:pb-28">
+    <section className="pb-14 sm:pb-16">
       <Container>
         <div className="reveal grid overflow-hidden rounded-media bg-brand-navy text-white lg:grid-cols-[1fr_0.85fr]">
           <div className="p-8 sm:p-12">
@@ -222,12 +222,12 @@ function TravelFeature() {
 
 function ProductsRow() {
   return (
-    <section className="border-t border-border bg-card py-20 sm:py-24">
+    <section className="border-t border-border bg-card py-14 sm:py-16">
       <Container>
         <div className="reveal flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <SectionHeading
             title="Recomendados por nuestros médicos"
-            description="Farmacia, alimentos y cuidado de marcas en las que confiamos. Pide en línea y recoge en tienda."
+            description="Alimentos, farmacia y cuidado recomendados por nuestros médicos."
           />
           <TextLink to="/tienda" className="shrink-0">
             Ver la tienda <ArrowRight weight="bold" className="transition-transform group-hover:translate-x-1" />
@@ -269,7 +269,7 @@ function BrandsMarquee() {
 function Testimonials() {
   const [main, ...rest] = testimonials;
   return (
-    <section className="py-20 sm:py-28">
+    <section className="py-14 sm:py-16">
       <Container>
         <SectionHeading eyebrow="Familias PetCare" title="Lo que cuentan los dueños" className="reveal" />
         <div className="mt-10 grid gap-5 lg:grid-cols-[1.35fr_1fr]">
@@ -302,7 +302,7 @@ function Testimonials() {
 
 export function VisitUs() {
   return (
-    <section className="pb-20 sm:pb-28">
+    <section className="pb-14 sm:pb-16">
       <Container>
         <div className="reveal grid gap-10 rounded-media bg-accent-soft p-8 sm:p-12 lg:grid-cols-[1.2fr_1fr] lg:items-center">
           <div>

@@ -5,14 +5,12 @@ import { Logo } from "@/components/Logo";
 import { Container } from "@/components/ui/Container";
 import { business } from "@/data/site";
 
-type Theme = "system" | "light" | "dark";
+type Theme = "light" | "dark";
 
 function applyTheme(theme: Theme) {
-  const dark = theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", dark);
+  document.documentElement.classList.toggle("dark", theme === "dark");
   try {
-    if (theme === "light") localStorage.removeItem("theme");
-    else localStorage.setItem("theme", theme);
+    localStorage.setItem("theme", theme);
   } catch {
     // sin almacenamiento: el cambio aplica solo a esta visita
   }
@@ -20,8 +18,7 @@ function applyTheme(theme: Theme) {
 
 function readTheme(): Theme {
   try {
-    const t = localStorage.getItem("theme");
-    return t === "system" || t === "dark" ? t : "light";
+    return localStorage.getItem("theme") === "dark" ? "dark" : "light";
   } catch {
     return "light";
   }
@@ -83,7 +80,6 @@ export function Footer() {
               >
                 <option value="light">Clara</option>
                 <option value="dark">Oscura</option>
-                <option value="system">Automática</option>
               </select>
             </label>
           </div>
