@@ -355,7 +355,8 @@ export type AppointmentSlot = {
   startsAt: string;
   endsAt: string;
   status: "available" | "reserved" | "booked" | "cancelled";
-  veterinarianId: string;
+  veterinarianId: string | null;
+  service: string;
   veterinarianName: string;
 };
 
@@ -390,9 +391,10 @@ export async function getAppointments(token: string): Promise<Appointment[]> {
 }
 
 export async function getAppointmentSlots(token: string): Promise<AppointmentSlot[]> {
-  const result = await adminRequest<{ slots: AppointmentSlot[] }>("/appointment-slots", {}, token);
+  const result = await adminRequest<{ slots: Array<Omit<AppointmentSlot, "service"> & { service?: string }> }>("/appointment-slots", {}, token);
   return result.slots.map((slot) => ({
     ...slot,
+    service: slot.service || "Consultas",
     startsAt: new Date(slot.startsAt).toISOString(),
     endsAt: new Date(slot.endsAt).toISOString(),
   }));
@@ -400,7 +402,7 @@ export async function getAppointmentSlots(token: string): Promise<AppointmentSlo
 
 export async function createAppointmentSlot(
   token: string,
-  slot: { startsAt: string; endsAt: string; veterinarianId?: string },
+  slot: { startsAt: string; endsAt: string; service: string; veterinarianId?: string },
 ) {
   return adminRequest<{ id: string }>("/appointment-slot-create", slot, token);
 }

@@ -42,10 +42,18 @@ export function AppointmentBooking() {
   const navigate = useNavigate();
   const { user, ready } = useAuth();
   const preselected = services.find((s) => s.id === params.get("servicio"))?.id ?? services[0].id;
+  const [selectedServiceId, setSelectedServiceId] = useState(preselected);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
+  const [selectedSlotId, setSelectedSlotId] = useState("");
   const [slotsLoading, setSlotsLoading] = useState(true);
   const [slotError, setSlotError] = useState("");
+  const selectedService = services.find((service) => service.id === selectedServiceId);
+  const serviceSlots = selectedService ? slots.filter((slot) => slot.service === selectedService.name) : [];
+
+  useEffect(() => {
+    setSelectedServiceId(preselected);
+  }, [preselected]);
 
   useEffect(() => {
     if (!ready) return;
@@ -83,9 +91,13 @@ export function AppointmentBooking() {
     }
 
     const get = (k: string) => String(data.get(k) ?? "").trim();
-    const service = services.find((s) => s.id === get("servicio_interes"))!;
+    const service = services.find((s) => s.id === get("servicio_interes"));
     const pet = `${get("nombre_mascota") || "sin nombre"} (${petOptions.find(([v]) => v === get("tipo_mascota"))?.[1] ?? "Mascota"})`;
     const slotId = get("appointment_slot");
+    if (!service || slotId !== selectedSlotId || !serviceSlots.some((slot) => slot.id === slotId)) {
+      setStatus({ kind: "error", message: "Elige un horario disponible para el servicio seleccionado." });
+      return;
+    }
 
     setStatus({ kind: "sending" });
     try {
@@ -114,6 +126,7 @@ export function AppointmentBooking() {
 
     setStatus({ kind: "sent", owner: user?.firstname || "cliente" });
     form.reset();
+    setSelectedSlotId("");
   }
 
   if (!ready || !user || user.role !== "customer") {
@@ -152,7 +165,16 @@ export function AppointmentBooking() {
                       </select>
                     </Field>
                     <Field label="Servicio" name="servicio_interes" className="sm:col-span-2">
-                      <select id="servicio_interes" name="servicio_interes" key={preselected} defaultValue={preselected} className={inputClass}>
+                      <select
+                        id="servicio_interes"
+                        name="servicio_interes"
+                        value={selectedServiceId}
+                        onChange={(event) => {
+                          setSelectedServiceId(event.target.value);
+                          setSelectedSlotId("");
+                        }}
+                        className={inputClass}
+                      >
                         {services.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
@@ -164,11 +186,19 @@ export function AppointmentBooking() {
                       {slotsLoading ? (
                         <div className="h-12 animate-pulse rounded-xl bg-muted" />
                       ) : (
-                        <select id="appointment_slot" name="appointment_slot" required defaultValue="" className={inputClass} disabled={slots.length === 0}>
-                          <option value="" disabled>{slots.length ? "Selecciona un horario" : "No hay horarios disponibles"}</option>
-                          {slots.map((slot) => (
+                        <select
+                          id="appointment_slot"
+                          name="appointment_slot"
+                          required
+                          value={selectedSlotId}
+                          onChange={(event) => setSelectedSlotId(event.target.value)}
+                          className={inputClass}
+                          disabled={serviceSlots.length === 0}
+                        >
+                          <option value="" disabled>{serviceSlots.length ? "Selecciona un horario" : "No hay horarios para este servicio"}</option>
+                          {serviceSlots.map((slot) => (
                             <option key={slot.id} value={slot.id}>
-                              {new Date(slot.startsAt).toLocaleString("es-PE", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · {slot.veterinarianName}
+                              {new Date(slot.startsAt).toLocaleString("es-PE", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · {slot.veterinarianName || "Personal por asignar"}
                             </option>
                           ))}
                         </select>
@@ -190,7 +220,7 @@ export function AppointmentBooking() {
 
               <ConsentFields />
 
-              <Button type="submit" size="lg" className="w-full" disabled={status.kind === "sending" || slotsLoading || slots.length === 0}>
+              <Button type="submit" size="lg" className="w-full" disabled={status.kind === "sending" || slotsLoading || serviceSlots.length === 0}>
                 {status.kind === "sending" ? (
                   <>
                     <CircleNotch weight="bold" className="animate-spin" /> Reservando
@@ -207,9 +237,9 @@ export function AppointmentBooking() {
                   <p className="font-bold text-danger">{status.message}</p>
                 </div>
               )}
-              {slots.length === 0 && !slotsLoading && !slotError && (
+              {serviceSlots.length === 0 && !slotsLoading && !slotError && (
                 <p className="rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">
-                  No hay horarios publicados por ahora. Vuelve a revisar más tarde o llámanos.
+                  No hay horarios publicados para {selectedService?.name ?? "este servicio"}. Vuelve a revisar más tarde o llámanos.
                 </p>
               )}
             </form>

@@ -447,15 +447,18 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
   await sql`
     CREATE TABLE IF NOT EXISTS petcare_appointment_slots (
       id UUID PRIMARY KEY,
-      veterinarian_id UUID NOT NULL REFERENCES petcare_users(id) ON DELETE CASCADE,
+      veterinarian_id UUID REFERENCES petcare_users(id) ON DELETE CASCADE,
       starts_at TIMESTAMPTZ NOT NULL,
       ends_at TIMESTAMPTZ NOT NULL,
+      service TEXT NOT NULL DEFAULT 'Consultas',
       status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'reserved', 'booked', 'cancelled')),
       created_by_id UUID REFERENCES petcare_users(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       CHECK (ends_at > starts_at)
     )
   `;
+  await sql`ALTER TABLE petcare_appointment_slots ALTER COLUMN veterinarian_id DROP NOT NULL`;
+  await sql`ALTER TABLE petcare_appointment_slots ADD COLUMN IF NOT EXISTS service TEXT NOT NULL DEFAULT 'Consultas'`;
   await sql`ALTER TABLE petcare_leads ADD COLUMN IF NOT EXISTS appointment_slot_id UUID REFERENCES petcare_appointment_slots(id) ON DELETE SET NULL`;
   await sql`ALTER TABLE petcare_leads ADD COLUMN IF NOT EXISTS appointment_price NUMERIC(10, 2)`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS petcare_leads_appointment_slot_idx ON petcare_leads (appointment_slot_id) WHERE appointment_slot_id IS NOT NULL`;
@@ -1308,13 +1311,14 @@ export default {
         const slots = await sql`
           SELECT s.id, s.starts_at AS "startsAt", s.ends_at AS "endsAt", s.status,
             s.veterinarian_id AS "veterinarianId",
+            s.service,
             concat_ws(' ', v.firstname, v.lastname) AS "veterinarianName"
           FROM petcare_appointment_slots s
-          JOIN petcare_users v ON v.id = s.veterinarian_id
+          LEFT JOIN petcare_users v ON v.id = s.veterinarian_id
           WHERE s.starts_at >= now()
             AND s.starts_at < now() + interval '90 days'
             AND s.status <> 'cancelled'
-            AND (${activeSession.role !== "veterinarian"} OR s.veterinarian_id = ${activeSession.id}::uuid)
+            AND (${activeSession.role !== "veterinarian"} OR s.veterinarian_id IS NULL OR s.veterinarian_id = ${activeSession.id}::uuid)
             AND (${activeSession.role !== "customer"} OR s.status = 'available')
           ORDER BY s.starts_at
           LIMIT 300
@@ -1372,7 +1376,7 @@ export default {
 
         const reserved = await sql`
           UPDATE petcare_appointment_slots SET status = 'reserved'
-          WHERE id = ${slotId}::uuid AND status = 'available' AND starts_at > now()
+          WHERE id = ${slotId}::uuid AND status = 'available' AND starts_at > now() AND service = ${service}
           RETURNING id
         `;
         if (!reserved.length) return response({ error: "Ese horario ya no está disponible. Elige otro cupo." }, 409, origin);
@@ -1421,38 +1425,49 @@ export default {
         }
         const startsAt = text(body?.startsAt, 40);
         const endsAt = text(body?.endsAt, 40);
+        const service = text(body?.service, 200);
         const start = Date.parse(startsAt);
         const end = Date.parse(endsAt);
         const duration = end - start;
         if (
-          !Number.isFinite(start) || !Number.isFinite(end) || start <= Date.now() ||
+          !Number.isFinite(start) || !Number.isFinite(end) || start <= Date.now() || !service ||
           start > Date.now() + 90 * 24 * 60 * 60 * 1000 ||
           duration < 15 * 60 * 1000 || duration > 4 * 60 * 60 * 1000
         ) {
           return response({ error: "El horario debe durar entre 15 minutos y 4 horas, dentro de los próximos 90 días." }, 400, origin);
         }
         const veterinarianId = activeSession.role === "veterinarian" ? activeSession.id : text(body?.veterinarianId, 36);
-        if (!UUID_PATTERN.test(veterinarianId)) return response({ error: "Elige un veterinario válido." }, 400, origin);
-        const veterinarian = await sql`
-          SELECT id FROM petcare_users WHERE id = ${veterinarianId}::uuid AND role = 'veterinarian' LIMIT 1
-        `;
-        if (!veterinarian.length) return response({ error: "No se encontró la cuenta del veterinario." }, 404, origin);
+        if (veterinarianId && !UUID_PATTERN.test(veterinarianId)) return response({ error: "Elige un veterinario válido." }, 400, origin);
+        if (veterinarianId) {
+          const veterinarian = await sql`
+            SELECT id FROM petcare_users WHERE id = ${veterinarianId}::uuid AND role = 'veterinarian' LIMIT 1
+          `;
+          if (!veterinarian.length) return response({ error: "No se encontró la cuenta del veterinario." }, 404, origin);
+        }
         const createdBy = UUID_PATTERN.test(activeSession.id) ? activeSession.id : null;
         const inserted = await sql`
-          WITH vet_lock AS (
-            SELECT pg_advisory_xact_lock(hashtextextended(${veterinarianId}, 0))
+          WITH schedule_lock AS (
+            SELECT pg_advisory_xact_lock(hashtextextended(lock_key, 0))
+            FROM (VALUES
+              (${`service:${service.toLowerCase()}`}),
+              (${veterinarianId ? `vet:${veterinarianId}` : `service:${service.toLowerCase()}`})
+            ) AS lock_keys(lock_key)
+            ORDER BY lock_key
           ),
           new_slot AS (
-            INSERT INTO petcare_appointment_slots (id, veterinarian_id, starts_at, ends_at, created_by_id)
-            SELECT ${crypto.randomUUID()}::uuid, ${veterinarianId}::uuid,
-              ${new Date(start).toISOString()}, ${new Date(end).toISOString()}, ${createdBy}::uuid
-            FROM vet_lock
+            INSERT INTO petcare_appointment_slots (id, veterinarian_id, starts_at, ends_at, service, created_by_id)
+            SELECT ${crypto.randomUUID()}::uuid, ${veterinarianId || null}::uuid,
+              ${new Date(start).toISOString()}, ${new Date(end).toISOString()}, ${service}, ${createdBy}::uuid
+            FROM (SELECT count(*) FROM schedule_lock) AS locks
             WHERE NOT EXISTS (
               SELECT 1 FROM petcare_appointment_slots
-              WHERE veterinarian_id = ${veterinarianId}::uuid
-                AND status <> 'cancelled'
+              WHERE status <> 'cancelled'
                 AND starts_at < ${new Date(end).toISOString()}
                 AND ends_at > ${new Date(start).toISOString()}
+                AND (
+                  service = ${service}
+                  OR (${veterinarianId || null}::uuid IS NOT NULL AND veterinarian_id = ${veterinarianId || null}::uuid)
+                )
             )
             RETURNING id
           )
