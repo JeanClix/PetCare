@@ -16,11 +16,10 @@ import { ButtonLink, TextLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { products } from "@/data/products";
-import { brands, business, photos, services, testimonials, yearsOfExperience } from "@/data/site";
+import { brands, business, photos, services, testimonials, travelPhotoCredit, yearsOfExperience } from "@/data/site";
 import { cn } from "@/lib/utils";
 
 const byId = (id: string) => services.find((s) => s.id === id)!;
-const travelCarrier = products.find((product) => product.id === 2356);
 
 // Los 8 productos más recientes del catálogo original
 const featuredProducts = products.slice(0, 8);
@@ -125,7 +124,7 @@ function Highlights() {
 
 function ServicesBento() {
   const consultas = byId("consultas");
-  const grooming = byId("grooming");
+  const banos = byId("banos");
   return (
     <section className="py-14 sm:py-16">
       <Container>
@@ -139,7 +138,7 @@ function ServicesBento() {
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:grid-rows-[auto_auto_auto]">
           {/* Consultas: celda principal con foto */}
           <article className="reveal relative isolate flex min-h-[26rem] flex-col justify-end overflow-hidden rounded-media p-7 text-white sm:col-span-2 lg:row-span-2">
-            <img src={photos.puppy} alt="Cachorro golden corriendo en el pasto" className="absolute inset-0 -z-10 size-full object-cover object-[50%_75%]" />
+            <img src={photos.consultation} alt="Veterinaria examinando a un gato durante una consulta" className="absolute inset-0 -z-10 size-full object-cover object-center" />
             <div className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-navy-deep via-brand-navy-deep/85 via-55% to-brand-navy-deep/10 sm:from-brand-navy-deep/95 sm:via-brand-navy-deep/45 sm:via-45% sm:to-transparent sm:to-75%" />
             <ServiceIcon name={consultas.icon} className="mb-3 size-9 text-[#6fe0c4]" />
             <h3 className="text-3xl font-black">{consultas.name}</h3>
@@ -151,14 +150,14 @@ function ServicesBento() {
             </ul>
           </article>
 
-          {/* Grooming: foto a un lado */}
+          {/* Baños de mascotas: foto a un lado */}
           <article className="reveal grid overflow-hidden rounded-media bg-card shadow-soft sm:col-span-2 sm:grid-cols-2">
-            <img src={photos.bath} alt="Golden retriever durante el baño" className="h-52 w-full object-cover sm:h-full" />
+            <img src={photos.bath} alt="Perro durante un baño de mascotas" className="h-52 w-full object-cover sm:h-full" />
             <div className="p-6">
-              <ServiceIcon name={grooming.icon} className="size-8 text-accent" />
-              <h3 className="mt-3 text-xl font-black">Baños y grooming</h3>
+              <ServiceIcon name={banos.icon} className="size-8 text-accent" />
+              <h3 className="mt-3 text-xl font-black">{banos.name}</h3>
               <p className="mt-1.5 text-[0.95rem] text-muted-foreground">
-                Cortes por raza, baños medicados y monitoreo por cámaras de seguridad.
+                Baños estéticos y medicados, con cuidado para su piel y pelaje.
               </p>
             </div>
           </article>
@@ -214,11 +213,18 @@ function TravelFeature() {
               </ButtonLink>
             </div>
           </div>
-          <img
-            src={travelCarrier?.image ?? photos.frenchie}
-            alt={travelCarrier ? "Transportadora para mascotas, ideal para viajes" : "Perro listo para viajar"}
-            className="h-72 w-full bg-white object-contain p-8 lg:h-full"
-          />
+          <figure className="relative h-72 overflow-hidden bg-white lg:h-full">
+            <img
+              src={photos.travel}
+              alt="Perro junto a su pasaporte y maletas para viajar"
+              className="size-full object-cover object-[58%_center]"
+            />
+            <figcaption className="absolute right-2 bottom-2 rounded-md bg-white/90 px-2 py-1 text-[0.65rem] text-muted-foreground shadow-sm">
+              <a href={travelPhotoCredit.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                {travelPhotoCredit.label}
+              </a>
+            </figcaption>
+          </figure>
         </div>
       </Container>
     </section>

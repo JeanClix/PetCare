@@ -1,12 +1,12 @@
 import {
   AirplaneTilt,
-  Bathtub,
   Bed,
   Cpu,
   Flask,
   HouseLine,
   Pulse,
   Scissors,
+  Shower,
   Stethoscope,
   Syringe,
   type IconProps,
@@ -15,7 +15,7 @@ import type { ServiceIcon as ServiceIconName } from "@/data/site";
 
 const serviceIcons = {
   stethoscope: Stethoscope,
-  bath: Bathtub,
+  bath: Shower,
   scissors: Scissors,
   flask: Flask,
   scan: Pulse,

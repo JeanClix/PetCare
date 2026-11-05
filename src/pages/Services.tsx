@@ -5,8 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { products } from "@/data/products";
-import { photos, services, type Service } from "@/data/site";
+import { photos, services, travelPhotoCredit, type Service } from "@/data/site";
 import { cn } from "@/lib/utils";
 import { VisitUs } from "@/pages/Home";
 
@@ -20,7 +19,6 @@ const travelSteps = [
 // Los servicios con lista de detalle ocupan el ancho completo; el resto va en dos columnas
 const featured = services.filter((s) => s.bullets);
 const regular = services.filter((s) => !s.bullets);
-const travelCarrier = products.find((product) => product.id === 2355);
 
 export function Services() {
   return (
@@ -31,7 +29,11 @@ export function Services() {
       />
 
       <Container className="space-y-5 py-10 sm:py-14">
-        <FeaturedService service={featured[0]} image={photos.frenchie} imageAlt="Bulldog francés, paciente de la clínica" />
+        <FeaturedService
+          service={featured[0]}
+          image={photos.consultation}
+          imageAlt="Veterinaria examinando a un gato durante una consulta"
+        />
 
         <div className="grid gap-5 md:grid-cols-2">
           {regular.map((s, i) => (
@@ -58,8 +60,9 @@ export function Services() {
 
         <FeaturedService
           service={featured[1]}
-          image={travelCarrier?.image ?? photos.aussie}
-          imageAlt={travelCarrier ? "Transportadora para mascotas, ideal para viajes" : "Perro de viaje"}
+          image={photos.travel}
+          imageAlt="Perro junto a su pasaporte y maletas para viajar"
+          imageCredit
           reverse
         />
       </Container>
@@ -95,16 +98,27 @@ function FeaturedService({
   service: s,
   image,
   imageAlt,
+  imageCredit = false,
   reverse = false,
 }: {
   service: Service;
   image: string;
   imageAlt: string;
+  imageCredit?: boolean;
   reverse?: boolean;
 }) {
   return (
     <article id={s.id} className="reveal grid scroll-mt-32 overflow-hidden rounded-media bg-card shadow-soft lg:grid-cols-2">
-      <img src={image} alt={imageAlt} className={cn("h-64 w-full object-cover lg:h-full", reverse && "lg:order-2")} />
+      <figure className={cn("relative h-64 lg:h-full", reverse && "lg:order-2")}>
+        <img src={image} alt={imageAlt} className="size-full object-cover object-[58%_center]" />
+        {imageCredit && (
+          <figcaption className="absolute right-2 bottom-2 rounded-md bg-white/90 px-2 py-1 text-[0.65rem] text-muted-foreground shadow-sm">
+            <a href={travelPhotoCredit.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+              {travelPhotoCredit.label}
+            </a>
+          </figcaption>
+        )}
+      </figure>
       <div className="p-7 sm:p-10">
         <ServiceIcon name={s.icon} className="size-10 text-accent" />
         <h2 className="mt-4 text-3xl font-black">{s.name}</h2>
