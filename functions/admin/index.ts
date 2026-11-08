@@ -1640,7 +1640,7 @@ export default {
           `,
           sql`SELECT id FROM petcare_social_media WHERE id = ${mediaId}::uuid LIMIT 1`,
         ]);
-        if (!connections.length) return response({ error: "Conecta primero la página de Facebook de Gabus Vet." }, 409, origin);
+        if (!connections.length) return response({ error: "Conecta primero la página de Facebook de PetCare." }, 409, origin);
         if (!mediaRows.length) return response({ error: "La imagen no está disponible. Adjunta otra vez el archivo." }, 404, origin);
         const connection = connections[0];
         const meta = metaConfig();
