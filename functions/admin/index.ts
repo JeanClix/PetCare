@@ -814,9 +814,9 @@ async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput
   return leadId;
 }
 
-async function parseJsonBody(request: Request) {
+async function parseJsonBody(request: Request, maxBytes = 64 * 1024) {
   const body = await request.text().catch(() => "");
-  if (new TextEncoder().encode(body).byteLength > 64 * 1024) return null;
+  if (new TextEncoder().encode(body).byteLength > maxBytes) return null;
   try {
     return JSON.parse(body) as Record<string, unknown>;
   } catch {
@@ -1509,7 +1509,7 @@ export default {
         return response({ mediaId }, 201, origin);
       }
 
-      const body = await parseJsonBody(request);
+      const body = await parseJsonBody(request, action === "site-content" ? 1024 * 1024 : undefined);
       if (action === "site-content") {
         const content = validateSiteContent(body?.content);
         if (!content) return response({ error: "Revisa los textos, imágenes y colores antes de publicar." }, 400, origin);

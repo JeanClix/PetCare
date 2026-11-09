@@ -88,9 +88,10 @@ function adminDevelopmentAuth() {
         }
 
         let raw = "";
+        const maxBodyBytes = path === "/site-content" ? 1024 * 1024 : 4096;
         request.on("data", (chunk: Buffer) => {
           raw += chunk.toString();
-          if (raw.length > 4096) {
+          if (Buffer.byteLength(raw) > maxBodyBytes) {
             response.writeHead(413, { "Content-Type": "application/json" });
             response.end(JSON.stringify({ error: "Solicitud demasiado grande" }));
             request.destroy();
