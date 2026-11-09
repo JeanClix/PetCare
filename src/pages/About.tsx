@@ -2,8 +2,9 @@ import { GraduationCap, Heart, Microscope, SealCheck } from "@phosphor-icons/rea
 import { PageHeader } from "@/components/PageHeader";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { business, photos, yearsOfExperience } from "@/data/site";
+import { yearsOfExperience } from "@/data/site";
 import { VisitUs } from "@/pages/Home";
+import { useSiteContent } from "@/context/SiteContentContext";
 
 const values = [
   { icon: Heart, title: "Cariño genuino", text: "Ver a nuestros pacientes sanos y felices es lo más gratificante de nuestro trabajo." },
@@ -13,24 +14,27 @@ const values = [
 ];
 
 export function About() {
+  const { text, image } = useSiteContent();
+  const editableValues = values.map((value, index) => ({
+    ...value,
+    title: text(`about.value.${index}.title`),
+    text: text(`about.value.${index}.description`),
+  }));
   return (
     <>
       <PageHeader
-        title={`${yearsOfExperience} años cuidando mascotas`}
-        description="PetCare nació en Surco para ofrecer atención veterinaria cercana y confiable."
+        title={text("about.page.heading")}
+        description={text("about.page.description")}
       />
 
       <Container className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[1fr_1.05fr]">
         <div className="reveal space-y-4 leading-relaxed text-muted-foreground">
-          <SectionHeading title={`Desde el ${business.foundedDate}`} />
-          <p>
-            Empezamos distribuyendo productos veterinarios y crecimos hasta convertirnos en una clínica dedicada al
-            bienestar de cada paciente.
-          </p>
+          <SectionHeading title={text("about.intro.title")} />
+          <p>{text("about.intro.description")}</p>
         </div>
         <div className="reveal relative pb-8">
           <img
-            src={photos.friends}
+            src={image("about.image")}
             alt="Un gato y un perro recostados juntos en el pasto"
             className="aspect-[4/3] w-full rounded-media object-cover shadow-lift"
           />
@@ -43,9 +47,9 @@ export function About() {
 
       <section className="border-y border-border bg-card py-14 sm:py-16">
         <Container className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
-          <SectionHeading title="Lo que nos mueve" className="reveal" />
+          <SectionHeading title={text("about.values.title")} className="reveal" />
           <dl className="grid gap-x-10 gap-y-7 sm:grid-cols-2">
-            {values.map(({ icon: Icon, title, text }) => (
+            {editableValues.map(({ icon: Icon, title, text }) => (
               <div key={title} className="reveal">
                 <dt className="flex items-center gap-3 font-display text-xl font-black">
                   <Icon weight="duotone" className="size-8 text-accent" /> {title}

@@ -2,8 +2,9 @@ import { ChatCircleDots, CircleNotch, PaperPlaneRight, Phone, Plus, X } from "@p
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ButtonAnchor, ButtonLink } from "@/components/ui/Button";
 import { useCart } from "@/context/CartContext";
-import { products } from "@/data/products";
-import { business, services } from "@/data/site";
+import { services } from "@/data/site";
+import { useSiteContent } from "@/context/SiteContentContext";
+import { editableService, sitePhoneHref } from "@/lib/siteContent";
 import { askAssistant, assistantUrl, type AssistantReply, type ChatTurn } from "@/lib/assistant";
 import { cn, formatPrice } from "@/lib/utils";
 
@@ -148,13 +149,15 @@ export function Assistant() {
 
 function MessageBubble({ message }: { message: Message }) {
   const { add } = useCart();
+  const { content, text } = useSiteContent();
 
   if (message.role === "user") {
     return <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-accent-foreground">{message.content}</p>;
   }
 
-  const recommended = (message.productos ?? []).map((id) => products.find((p) => p.id === id)).filter((p) => p !== undefined);
+  const recommended = (message.productos ?? []).map((id) => content.products.find((p) => p.id === id)).filter((p) => p !== undefined);
   const service = services.find((s) => s.id === message.servicio);
+  const editableRecommendedService = service ? editableService(service, text) : undefined;
 
   return (
     <div className="max-w-[92%] space-y-3">
@@ -162,8 +165,8 @@ function MessageBubble({ message }: { message: Message }) {
         {message.content}
       </p>
       {message.urgente && (
-        <ButtonAnchor href={business.emergencyHref} target="_self" size="sm" className="bg-danger hover:bg-danger/90">
-          <Phone weight="bold" /> Emergencias {business.emergency}
+        <ButtonAnchor href={sitePhoneHref(text("global.emergency"))} target="_self" size="sm" className="bg-danger hover:bg-danger/90">
+          <Phone weight="bold" /> Emergencias {text("global.emergency")}
         </ButtonAnchor>
       )}
       {recommended.length > 0 && (
@@ -189,9 +192,9 @@ function MessageBubble({ message }: { message: Message }) {
           ))}
         </ul>
       )}
-      {service && (
-        <ButtonLink to={`/citas?servicio=${service.id}`} variant="outline" size="sm">
-          Agendar cita: {service.name}
+      {editableRecommendedService && (
+        <ButtonLink to={`/citas?servicio=${editableRecommendedService.id}`} variant="outline" size="sm">
+          Agendar cita: {editableRecommendedService.name}
         </ButtonLink>
       )}
     </div>

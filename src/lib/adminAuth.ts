@@ -1,5 +1,5 @@
 const configuredAdminApiUrl = (import.meta.env.VITE_ADMIN_API_URL as string | undefined)?.trim().replace(/\/+$/, "");
-const adminApiUrl = configuredAdminApiUrl || (import.meta.env.DEV ? "/api/admin" : undefined);
+export const adminApiUrl = configuredAdminApiUrl || (import.meta.env.DEV ? "/api/admin" : undefined);
 
 export const accountRoles = ["customer", "admin", "veterinarian", "sales"] as const;
 export type AccountRole = typeof accountRoles[number];
@@ -53,6 +53,41 @@ export async function adminRequest<T = { error?: string }>(path: string, body: u
   if (!response.ok) throw new Error(result?.error ?? "No se pudo validar la sesión.");
   if (!result) throw new Error("El servicio devolvió una respuesta inválida.");
   return result as T;
+}
+
+export async function getPublicSiteContent() {
+  if (!adminApiUrl) return null;
+  let response: Response;
+  try {
+    response = await fetch(`${adminApiUrl}/site-content`, { cache: "no-store" });
+  } catch {
+    throw new Error("No se pudo conectar con el servicio de contenido del sitio.");
+  }
+  const result = await response.json().catch(() => null) as { content?: unknown; error?: string } | null;
+  if (!response.ok) throw new Error(result?.error ?? "No se pudo cargar el contenido del sitio.");
+  if (!result) throw new Error("El servicio devolvió una respuesta inválida.");
+  return result.content ?? null;
+}
+
+export async function uploadSiteImage(token: string, file: File) {
+  if (!adminApiUrl) throw new Error("La autenticación administrativa aún no está configurada.");
+  let response: Response;
+  try {
+    response = await fetch(`${adminApiUrl}/site-image-upload`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": file.type,
+      },
+      body: file,
+    });
+  } catch {
+    throw new Error("No se pudo conectar con el servicio de imágenes.");
+  }
+  const result = await response.json().catch(() => null) as { url?: string; error?: string } | null;
+  if (!response.ok) throw new Error(result?.error ?? "No se pudo subir la imagen.");
+  if (!result?.url) throw new Error("El servicio devolvió una respuesta inválida.");
+  return result.url;
 }
 
 export function isAdminAuthConfigured() {

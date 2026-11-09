@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { products, type Product } from "@/data/products";
+import type { Product } from "@/data/products";
+import { useSiteContent } from "@/context/SiteContentContext";
 
 interface CartLine {
   product: Product;
@@ -31,6 +32,8 @@ function loadCart(): Record<number, number> {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { content } = useSiteContent();
+  const products = content.products;
   const [items, setItems] = useState<Record<number, number>>(loadCart);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -73,7 +76,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }),
       clear: () => setItems({}),
     };
-  }, [items, isOpen]);
+  }, [items, isOpen, products]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

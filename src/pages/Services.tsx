@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { photos, services, type Service } from "@/data/site";
+import { services, type Service } from "@/data/site";
+import { useSiteContent } from "@/context/SiteContentContext";
+import { editableService } from "@/lib/siteContent";
 import { cn } from "@/lib/utils";
 import { VisitUs } from "@/pages/Home";
 
@@ -16,22 +18,22 @@ const travelSteps = [
   { icon: AirplaneTilt, title: "Listos para viajar", text: "Te entregamos todo en regla, con jaula y accesorios de viaje." },
 ];
 
-// Los servicios con lista de detalle ocupan el ancho completo; el resto va en dos columnas
-const featured = services.filter((s) => s.bullets);
-const regular = services.filter((s) => !s.bullets);
-
 export function Services() {
+  const { text, image } = useSiteContent();
+  const editableServices = services.map((service) => editableService(service, text));
+  const featured = editableServices.filter((service) => service.id === "consultas" || service.id === "viajes");
+  const regular = editableServices.filter((service) => service.id !== "consultas" && service.id !== "viajes");
   return (
     <>
       <PageHeader
-        title="Servicios veterinarios en Surco"
-        description="Atención médica, grooming y más para perros, gatos y mascotas exóticas."
+        title={text("services.page.title")}
+        description={text("services.page.description")}
       />
 
       <Container className="space-y-5 py-10 sm:py-14">
         <FeaturedService
           service={featured[0]}
-          image={photos.consultation}
+          image={image("home.services.consultation")}
           imageAlt="Veterinaria examinando a un gato durante una consulta"
         />
 
@@ -60,7 +62,7 @@ export function Services() {
 
         <FeaturedService
           service={featured[1]}
-          image={photos.travel}
+          image={image("home.travel.image")}
           imageAlt="Perro viajando dentro de una maleta con su dueño"
           compact
           reverse
@@ -71,8 +73,8 @@ export function Services() {
         <Container>
           <SectionHeading
             eyebrow="Tranquilo, podemos ayudarte"
-            title="Así preparamos el viaje de tu mascota"
-            description="Te guiamos con los requisitos y documentos para viajar con tu mascota."
+            title={text("services.travel.title")}
+            description={text("services.travel.description")}
             className="reveal"
           />
           <ol className="mt-8 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">

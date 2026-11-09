@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Minus, Plus, Receipt, ShoppingBag } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
-import { products, type Product } from "@/data/products";
+import type { Product } from "@/data/products";
+import { useSiteContent } from "@/context/SiteContentContext";
 import { createCustomerPurchase, type ContactRecord, type CustomerPurchase, type PurchaseItem } from "@/lib/crm";
 import { formatPrice } from "@/lib/utils";
 
@@ -10,8 +11,6 @@ type PurchaseDraftItem = {
   quantity: number;
   unitPrice: number;
 };
-
-const initialProduct = products[0];
 
 function draftFor(product: Product): PurchaseDraftItem {
   return { productId: product.id, quantity: 1, unitPrice: product.price };
@@ -30,8 +29,10 @@ export function PurchaseRegister({
   searchTerm: string;
   onSaved: () => Promise<void>;
 }) {
+  const { content } = useSiteContent();
+  const products = content.products;
   const [contactId, setContactId] = useState("");
-  const [items, setItems] = useState<PurchaseDraftItem[]>(initialProduct ? [draftFor(initialProduct)] : []);
+  const [items, setItems] = useState<PurchaseDraftItem[]>(() => products[0] ? [draftFor(products[0])] : []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -86,7 +87,7 @@ export function PurchaseRegister({
     try {
       await createCustomerPurchase(token, { contactId, items: purchaseItems });
       await onSaved();
-      setItems(initialProduct ? [draftFor(initialProduct)] : []);
+      setItems(products[0] ? [draftFor(products[0])] : []);
       setMessage("Compra registrada correctamente.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo registrar la compra.");
@@ -200,7 +201,7 @@ export function PurchaseRegister({
               <button
                 type="button"
                 disabled={items.length >= 50}
-                onClick={() => initialProduct && setItems((current) => [...current, draftFor(initialProduct)])}
+                onClick={() => products[0] && setItems((current) => [...current, draftFor(products[0])])}
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-bold text-accent hover:bg-accent-soft disabled:opacity-40"
               >
                 <Plus weight="bold" /> {items.length >= 50 ? "Límite de productos alcanzado" : "Agregar producto"}
