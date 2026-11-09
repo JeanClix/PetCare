@@ -20,10 +20,12 @@ import {
   inputClass,
 } from "@/components/ui/Form";
 import type { Pet } from "@/data/products";
-import { business, photos, services } from "@/data/site";
+import { business, services } from "@/data/site";
 import { useAuth } from "@/context/AuthContext";
 import { bookAppointment, getAppointmentSlots, type AppointmentSlot } from "@/lib/crm";
 import { whatsappLink } from "@/lib/utils";
+import { useSiteContent } from "@/context/SiteContentContext";
+import { sitePhoneHref } from "@/lib/siteContent";
 
 type Status =
   | { kind: "idle" }
@@ -38,6 +40,7 @@ const petOptions: [Pet, string][] = [
 ];
 
 export function AppointmentBooking() {
+  const { text, image } = useSiteContent();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { user, ready } = useAuth();
@@ -136,9 +139,9 @@ export function AppointmentBooking() {
   return (
     <>
       <PageHeader
-        title="Agenda tu cita"
-        description="Elige un horario disponible y consulta el estado de tu reserva desde Mi cuenta."
-        image={{ src: photos.corgi, alt: "Corgi mirando a la cámara" }}
+        title={text("appointments.page.title")}
+        description={text("appointments.page.description")}
+        image={{ src: image("appointments.image"), alt: "Corgi mirando a la cámara" }}
       />
 
       <Container className="grid gap-10 py-14 sm:py-20 lg:grid-cols-[1.15fr_1fr]">
@@ -177,7 +180,7 @@ export function AppointmentBooking() {
                       >
                         {services.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.name}
+                            {text(`service.${s.id}.name`)}
                           </option>
                         ))}
                       </select>
@@ -253,9 +256,9 @@ export function AppointmentBooking() {
                 {business.address}
               </a>
             </InfoRow>
-            <InfoRow icon={<Clock weight="duotone" />} title="Horario">{business.hours}</InfoRow>
+            <InfoRow icon={<Clock weight="duotone" />} title="Horario">{text("global.hours")}</InfoRow>
             <InfoRow icon={<Phone weight="duotone" />} title="Teléfono">
-              <a href={business.phoneHref} className="hover:text-accent">{business.phone}</a>
+              <a href={sitePhoneHref(text("global.phone"))} className="hover:text-accent">{text("global.phone")}</a>
             </InfoRow>
             <InfoRow icon={<InstagramLogo weight="duotone" />} title="Instagram">
               <a href={business.instagram} target="_blank" rel="noopener noreferrer" className="hover:text-accent">
@@ -270,8 +273,8 @@ export function AppointmentBooking() {
             </p>
             <p className="mt-1.5 text-muted-foreground">Llámanos y te atiende una persona de nuestro equipo.</p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <ButtonAnchor href={business.emergencyHref} target="_self">
-                <Phone weight="bold" /> {business.emergency}
+              <ButtonAnchor href={sitePhoneHref(text("global.emergency"))} target="_self">
+                <Phone weight="bold" /> {text("global.emergency")}
               </ButtonAnchor>
               <ButtonAnchor href={whatsappLink("Hola PetCare, tengo una emergencia con mi mascota.")} variant="whatsapp">
                 <WhatsappLogo weight="fill" /> WhatsApp

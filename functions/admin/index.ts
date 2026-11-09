@@ -36,6 +36,9 @@ const WHATSAPP_SEND_ACTIONS = ["whatsapp-send", "whatsapp-history"];
 const SOCIAL_ADMIN_ACTIONS = [
   "social-status", "social-connect", "social-select", "social-disconnect", "social-upload", "social-publish",
 ];
+const SITE_ADMIN_ACTIONS = ["site-content", "site-image-upload"];
+const SITE_CONTENT_KEY = /^[a-zA-Z0-9._-]{1,100}$/;
+const SITE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 // Qué secciones del panel interno puede usar cada rol de staff
 const STAFF_PERMISSIONS: Record<Exclude<AccountRole, "customer">, ReadonlySet<string>> = {
@@ -44,7 +47,7 @@ const STAFF_PERMISSIONS: Record<Exclude<AccountRole, "customer">, ReadonlySet<st
     "appointment-slot-create", "appointment-slot-cancel", "marketing-test-send", "marketing-send",
     "lifecycle", "contact-notes", "message-status", "lead-status", "clear", "import-lead", "purchase-create",
     ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS, "whatsapp-status", "whatsapp-logout",
-    ...SOCIAL_ADMIN_ACTIONS,
+    ...SOCIAL_ADMIN_ACTIONS, ...SITE_ADMIN_ACTIONS,
   ]),
   sales: new Set([
     "read", "appointments", "appointment-status", "appointment-slots", "marketing-test-send", "marketing-send",
@@ -616,6 +619,96 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS petcare_social_posts_created_idx ON petcare_social_posts (created_at DESC)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_site_content (
+      id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      content JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_site_images (
+      id UUID PRIMARY KEY,
+      mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+      data_base64 TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+}
+
+function validateSiteContent(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const content = value as { texts?: unknown; images?: unknown; colors?: unknown };
+  if (
+    !content.texts || typeof content.texts !== "object" || Array.isArray(content.texts) ||
+    !content.images || typeof content.images !== "object" || Array.isArray(content.images) ||
+    !content.colors || typeof content.colors !== "object" || Array.isArray(content.colors)
+  ) return null;
+
+  const texts = Object.entries(content.texts as Record<string, unknown>);
+  const images = Object.entries(content.images as Record<string, unknown>);
+  const products = content.products;
+  const colors = content.colors as Record<string, unknown>;
+  if (
+    texts.length > 100 ||
+    images.length > 100 ||
+    !Array.isArray(products) ||
+    products.length > 200 ||
+    texts.some(([key, text]) => !SITE_CONTENT_KEY.test(key) || typeof text !== "string" || text.length > 3000) ||
+    images.some(([key, image]) => !SITE_CONTENT_KEY.test(key) || typeof image !== "string" || image.length > 2000) ||
+    !/^#[\da-f]{6}$/i.test(String(colors.primary ?? "")) ||
+    !/^#[\da-f]{6}$/i.test(String(colors.accent ?? ""))
+  ) return null;
+
+  for (const [, image] of images) {
+    try {
+      const url = new URL(String(image), "https://petcare.invalid");
+      if (url.protocol !== "https:" && !(
+        url.origin === "https://petcare.invalid" &&
+        (String(image).startsWith("/") || String(image).startsWith("./")) &&
+        !String(image).startsWith("//")
+      )) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+  const productIds = new Set<number>();
+  for (const product of products) {
+    if (!product || typeof product !== "object" || Array.isArray(product)) return null;
+    const item = product as Record<string, unknown>;
+    if (
+      !Number.isInteger(item.id) || Number(item.id) < 1 || productIds.has(Number(item.id)) ||
+      typeof item.name !== "string" || item.name.length > 300 ||
+      !Array.isArray(item.pets) || item.pets.some((pet) => !["perro", "gato", "exotico"].includes(String(pet))) ||
+      !["alimento", "farmacia", "higiene", "accesorio"].includes(String(item.category)) ||
+      typeof item.subcategory !== "string" || item.subcategory.length > 200 ||
+      typeof item.price !== "number" || !Number.isFinite(item.price) || item.price < 0 ||
+      !(item.priceMax === null || (typeof item.priceMax === "number" && Number.isFinite(item.priceMax) && item.priceMax >= item.price)) ||
+      typeof item.image !== "string" || item.image.length > 2000 ||
+      typeof item.description !== "string" || item.description.length > 5000
+    ) return null;
+    try {
+      const url = new URL(item.image, "https://petcare.invalid");
+      if (url.protocol !== "https:" && !(
+        url.origin === "https://petcare.invalid" &&
+        (item.image.startsWith("/") || item.image.startsWith("./")) &&
+        !item.image.startsWith("//")
+      )) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+    productIds.add(Number(item.id));
+  }
+  return {
+    texts: Object.fromEntries(texts),
+    images: Object.fromEntries(images),
+    products,
+    colors: { primary: colors.primary, accent: colors.accent },
+  };
 }
 
 async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput, metadata: CaptureMetadata = {}): Promise<string> {
@@ -764,14 +857,17 @@ export default {
     const route = path.split("/").filter(Boolean);
     const action = route.at(-1) ?? "";
     const socialMediaId = route.at(-2) === "social-media" ? action : "";
+    const siteImageId = route.at(-2) === "site-image" ? action : "";
     const isPublicSocialMedia = UUID_PATTERN.test(socialMediaId);
+    const isPublicSiteImage = UUID_PATTERN.test(siteImageId);
     if (
       origin &&
       !allowedOrigins.has(origin) &&
       action !== "unsubscribe" &&
       action !== "resend" &&
       action !== "social-callback" &&
-      !isPublicSocialMedia
+      !isPublicSocialMedia &&
+      !isPublicSiteImage
     ) {
       return response({ error: "Origen no permitido" }, 403, null);
     }
@@ -781,6 +877,37 @@ export default {
     if (!config) return response({ error: "Autenticación administrativa no configurada" }, 503, origin);
 
     const sql = neon(config.databaseUrl);
+    if (isPublicSiteImage && request.method === "GET") {
+      try {
+        await ensureSchema(sql);
+        const rows = await sql`
+          SELECT mime_type, data_base64 FROM petcare_site_images WHERE id = ${siteImageId}::uuid LIMIT 1
+        `;
+        const row = rows[0];
+        if (!row) return new Response("No se encontró la imagen.", { status: 404 });
+        return new Response(new Uint8Array(Buffer.from(String(row.data_base64), "base64")), {
+          status: 200,
+          headers: {
+            "Content-Type": String(row.mime_type),
+            "Cache-Control": "public, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      } catch (error) {
+        console.error("No se pudo servir una imagen del sitio", error);
+        return new Response("No se pudo recuperar la imagen.", { status: 503 });
+      }
+    }
+    if (action === "site-content" && request.method === "GET") {
+      try {
+        await ensureSchema(sql);
+        const rows = await sql`SELECT content FROM petcare_site_content WHERE id = 1 LIMIT 1`;
+        return response({ content: rows[0]?.content ?? null }, 200, origin);
+      } catch (error) {
+        console.error("No se pudo cargar el contenido del sitio", error);
+        return response({ error: "No se pudo cargar el contenido del sitio." }, 503, origin);
+      }
+    }
     if (isPublicSocialMedia && request.method === "GET") {
       try {
         await ensureSchema(sql);
@@ -1342,6 +1469,29 @@ export default {
         `;
         return response({ appointments }, 200, origin);
       }
+      if (action === "site-image-upload") {
+        const mimeType = request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() ?? "";
+        if (!SITE_IMAGE_TYPES.has(mimeType)) {
+          return response({ error: "Usa una imagen JPG, PNG o WebP." }, 415, origin);
+        }
+        const image = await readBoundedBody(request, 5 * 1024 * 1024);
+        if (!image?.byteLength) return response({ error: "La imagen debe pesar 5 MB o menos." }, 413, origin);
+        const validImage = mimeType === "image/jpeg"
+          ? image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff
+          : mimeType === "image/png"
+            ? image[0] === 0x89 && image[1] === 0x50 && image[2] === 0x4e && image[3] === 0x47 &&
+              image[4] === 0x0d && image[5] === 0x0a && image[6] === 0x1a && image[7] === 0x0a
+            : image[0] === 0x52 && image[1] === 0x49 && image[2] === 0x46 && image[3] === 0x46 &&
+              image[8] === 0x57 && image[9] === 0x45 && image[10] === 0x42 && image[11] === 0x50;
+        if (!validImage) return response({ error: "El archivo no coincide con su formato de imagen." }, 415, origin);
+        const imageId = crypto.randomUUID();
+        await sql`
+          INSERT INTO petcare_site_images (id, mime_type, data_base64)
+          VALUES (${imageId}::uuid, ${mimeType}, ${Buffer.from(image).toString("base64")})
+        `;
+        const imagePath = url.pathname.replace(/\/site-image-upload\/?$/, `/site-image/${imageId}`);
+        return response({ url: `${url.origin}${imagePath}` }, 201, origin);
+      }
       if (action === "social-upload") {
         if (request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !== "image/jpeg") {
           return response({ error: "Solo se aceptan imágenes JPEG." }, 415, origin);
@@ -1360,6 +1510,16 @@ export default {
       }
 
       const body = await parseJsonBody(request);
+      if (action === "site-content") {
+        const content = validateSiteContent(body?.content);
+        if (!content) return response({ error: "Revisa los textos, imágenes y colores antes de publicar." }, 400, origin);
+        await sql`
+          INSERT INTO petcare_site_content (id, content, updated_at)
+          VALUES (1, ${JSON.stringify(content)}::jsonb, now())
+          ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at
+        `;
+        return response({ content }, 200, origin);
+      }
       if (action === "book-appointment") {
         if (activeSession.role !== "customer") return response({ error: "Inicia sesión con tu cuenta de cliente para reservar." }, 403, origin);
         const slotId = text(body?.slotId, 36);

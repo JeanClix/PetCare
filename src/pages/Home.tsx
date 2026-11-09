@@ -15,14 +15,12 @@ import { ProductCard } from "@/components/ProductCard";
 import { ButtonLink, TextLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { products } from "@/data/products";
-import { brands, business, photos, services, testimonials, yearsOfExperience } from "@/data/site";
+import { brands, business, services, testimonials, yearsOfExperience } from "@/data/site";
+import { useSiteContent } from "@/context/SiteContentContext";
 import { cn } from "@/lib/utils";
+import { editableService, sitePhoneHref } from "@/lib/siteContent";
 
-const byId = (id: string) => services.find((s) => s.id === id)!;
-
-// Los 8 productos más recientes del catálogo original
-const featuredProducts = products.slice(0, 8);
+const byId = (id: string, text: (key: string) => string) => editableService(services.find((s) => s.id === id)!, text);
 
 export function Home() {
   return (
@@ -40,25 +38,26 @@ export function Home() {
 }
 
 function Hero() {
+  const { text, image } = useSiteContent();
   return (
     <section className="overflow-hidden">
       <Container className="grid items-center gap-12 pt-10 pb-16 sm:pt-14 lg:grid-cols-[1.15fr_1fr] lg:gap-10 lg:pt-16 lg:pb-20">
         <div className="animate-fade-up">
           <p className="mb-3 font-display text-base font-extrabold text-accent italic">
-            Clínica veterinaria en Surco
+            {text("home.hero.eyebrow")}
           </p>
           <h1 className="text-[2.6rem] leading-[1.02] font-black tracking-[-0.035em] text-primary sm:text-6xl lg:text-[3.5rem] xl:text-[3.75rem]">
-            Cuidamos a tu mascota en cada etapa
+            {text("home.hero.title")}
           </h1>
           <p className="mt-5 max-w-[42ch] text-lg leading-relaxed text-muted-foreground sm:text-xl">
-            Consultas, grooming y farmacia para perros, gatos y mascotas exóticas.
+            {text("home.hero.description")}
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4">
             <ButtonLink to="/citas" size="lg">
-              Agendar cita
+              {text("home.hero.primaryCta")}
             </ButtonLink>
             <TextLink to="/tienda">
-              Ver la tienda <ArrowRight weight="bold" className="transition-transform group-hover:translate-x-1" />
+              {text("home.hero.secondaryCta")} <ArrowRight weight="bold" className="transition-transform group-hover:translate-x-1" />
             </TextLink>
           </div>
         </div>
@@ -66,13 +65,13 @@ function Hero() {
         {/* Collage: perro, gato y exóticos, los tres pacientes que atiende la clínica */}
         <div className="relative mx-auto w-full max-w-lg animate-fade-up [animation-delay:120ms] lg:max-w-none">
           <div className="ml-auto w-[82%] overflow-hidden rounded-media shadow-lift">
-            <img src={photos.beagle} alt="Beagle sonriendo" className="aspect-[4/5] w-full object-cover" />
+            <img src={image("home.hero.beagle")} alt={text("home.hero.beagleAlt")} className="aspect-[4/5] w-full object-cover" />
           </div>
           <div className="absolute top-[8%] left-0 w-[38%] overflow-hidden rounded-card border-4 border-background shadow-lift">
-            <img src={photos.cat} alt="Gato blanco y negro" className="aspect-square w-full object-cover" />
+            <img src={image("home.hero.cat")} alt={text("home.hero.catAlt")} className="aspect-square w-full object-cover" />
           </div>
           <div className="absolute bottom-[14%] left-[4%] w-[34%] overflow-hidden rounded-card border-4 border-background shadow-lift">
-            <img src={photos.guineaPigs} alt="Dos cuyes comiendo zanahoria" className="aspect-[4/3] w-full object-cover" />
+            <img src={image("home.hero.guineaPigs")} alt={text("home.hero.guineaPigsAlt")} className="aspect-[4/3] w-full object-cover" />
           </div>
           <div className="absolute right-4 -bottom-5 flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-lift sm:right-8">
             <div className="flex -space-x-1.5 text-accent">
@@ -94,11 +93,12 @@ function Hero() {
 }
 
 function Highlights() {
+  const { text } = useSiteContent();
   const items = [
     { value: `${yearsOfExperience} años`, label: "Cuidando mascotas en Surco" },
-    { value: "10 servicios", label: "Salud, grooming y más" },
-    { value: "Con cámaras", label: "Seguimiento durante el grooming" },
-    { value: "A domicilio", label: "Consultas sin salir de casa" },
+    { value: text("home.highlights.services"), label: text("home.highlights.servicesLabel") },
+    { value: text("home.highlights.cameras"), label: text("home.highlights.camerasLabel") },
+    { value: text("home.highlights.homeVisits"), label: text("home.highlights.homeVisitsLabel") },
   ];
   return (
     <section className="border-y border-border bg-card">
@@ -123,22 +123,23 @@ function Highlights() {
 }
 
 function ServicesBento() {
-  const consultas = byId("consultas");
-  const banos = byId("banos");
+  const { text, image } = useSiteContent();
+  const consultas = byId("consultas", text);
+  const banos = byId("banos", text);
   return (
     <section className="py-14 sm:py-16">
       <Container>
         <div className="reveal flex flex-col justify-between gap-5 md:flex-row md:items-end">
-          <SectionHeading title="Todo lo que necesita, en un solo lugar" />
+          <SectionHeading title={text("home.highlights.title")} />
           <TextLink to="/servicios" className="shrink-0">
-            Ver los 10 servicios <ArrowRight weight="bold" className="transition-transform group-hover:translate-x-1" />
+            {text("home.services.link")} <ArrowRight weight="bold" className="transition-transform group-hover:translate-x-1" />
           </TextLink>
         </div>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:grid-rows-[auto_auto_auto]">
           {/* Consultas: celda principal con foto */}
           <article className="reveal relative isolate flex min-h-[26rem] flex-col justify-end overflow-hidden rounded-media p-7 text-white sm:col-span-2 lg:row-span-2">
-            <img src={photos.consultation} alt="Veterinaria examinando a un gato durante una consulta" className="absolute inset-0 -z-10 size-full object-cover object-center" />
+            <img src={image("home.services.consultation")} alt="Veterinaria examinando a un gato durante una consulta" className="absolute inset-0 -z-10 size-full object-cover object-center" />
             <div className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-navy-deep via-brand-navy-deep/85 via-55% to-brand-navy-deep/10 sm:from-brand-navy-deep/95 sm:via-brand-navy-deep/45 sm:via-45% sm:to-transparent sm:to-75%" />
             <ServiceIcon name={consultas.icon} className="mb-3 size-9 text-[#6fe0c4]" />
             <h3 className="text-3xl font-black">{consultas.name}</h3>
@@ -152,7 +153,7 @@ function ServicesBento() {
 
           {/* Baños de mascotas: foto a un lado */}
           <article className="reveal grid overflow-hidden rounded-media bg-card shadow-soft sm:col-span-2 sm:grid-cols-2">
-            <img src={photos.bath} alt="Perro durante un baño de mascotas" className="h-52 w-full object-cover sm:h-full" />
+            <img src={image("home.services.bath")} alt="Perro durante un baño de mascotas" className="h-52 w-full object-cover sm:h-full" />
             <div className="p-6">
               <ServiceIcon name={banos.icon} className="size-8 text-accent" />
               <h3 className="mt-3 text-xl font-black">{banos.name}</h3>
@@ -176,7 +177,8 @@ function ServicesBento() {
 }
 
 function SmallService({ id, className }: { id: string; className?: string }) {
-  const s = byId(id);
+  const { text } = useSiteContent();
+  const s = byId(id, text);
   return (
     <article className={cn("reveal rounded-media p-6", className)}>
       <ServiceIcon name={s.icon} className="size-8 text-accent" />
@@ -187,15 +189,16 @@ function SmallService({ id, className }: { id: string; className?: string }) {
 }
 
 function TravelFeature() {
-  const travel = byId("viajes");
+  const { text, image } = useSiteContent();
+  const travel = byId("viajes", text);
   return (
     <section className="pb-14 sm:pb-16">
       <Container>
         <div className="reveal grid overflow-hidden rounded-media bg-brand-navy text-white lg:grid-cols-[1fr_0.85fr]">
           <div className="p-6 sm:p-8">
-            <p className="font-display text-sm font-extrabold text-[#6fe0c4] italic">Trámites de viaje y microchip</p>
-            <h2 className="mt-2 text-2xl leading-[1.08] font-black sm:text-3xl">¿Viajas con tu mascota? Nosotros vemos los papeles.</h2>
-            <p className="mt-3 max-w-[52ch] text-base text-white/80">{travel.description}</p>
+            <p className="font-display text-sm font-extrabold text-[#6fe0c4] italic">{text("home.travel.eyebrow")}</p>
+            <h2 className="mt-2 text-2xl leading-[1.08] font-black sm:text-3xl">{text("home.travel.title")}</h2>
+            <p className="mt-3 max-w-[52ch] text-base text-white/80">{text("home.travel.description")}</p>
             <ul className="mt-4 grid gap-x-5 gap-y-2 sm:grid-cols-2">
               {travel.bullets!.map((b) => (
                 <li key={b} className="flex gap-2 text-sm">
@@ -215,8 +218,8 @@ function TravelFeature() {
           </div>
           <div className="relative h-64 overflow-hidden bg-white sm:h-72 lg:h-auto lg:min-h-[24rem]">
             <img
-              src={photos.travel}
-              alt="Perro viajando dentro de una maleta con su dueño"
+              src={image("home.travel.image")}
+              alt={text("home.travel.imageAlt")}
               className="absolute inset-0 size-full object-cover object-[58%_center]"
             />
           </div>
@@ -227,13 +230,15 @@ function TravelFeature() {
 }
 
 function ProductsRow() {
+  const { content, text } = useSiteContent();
+  const featuredProducts = content.products.slice(0, 8);
   return (
     <section className="border-t border-border bg-card py-14 sm:py-16">
       <Container>
         <div className="reveal flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <SectionHeading
-            title="Recomendados por nuestros médicos"
-            description="Alimentos, farmacia y cuidado recomendados por nuestros médicos."
+            title={text("home.products.title")}
+            description={text("home.products.description")}
           />
           <TextLink to="/tienda" className="shrink-0">
             Ver la tienda <ArrowRight weight="bold" className="transition-transform group-hover:translate-x-1" />
@@ -251,18 +256,23 @@ function ProductsRow() {
 }
 
 function BrandsMarquee() {
-  const row = [...brands, ...brands];
+  const { text, image } = useSiteContent();
+  const editableBrands = brands.map((_brand, index) => ({
+    name: text(`brand.${index}.name`),
+    logo: image(`brand.${index}.logo`),
+  }));
+  const row = [...editableBrands, ...editableBrands];
   return (
     <section className="overflow-hidden border-y border-border bg-card py-10" aria-labelledby="brands-title">
       <Container>
         <h2 id="brands-title" className="text-center font-display text-base font-extrabold text-muted-foreground">
-          Marcas que encuentras en PetCare
+          {text("home.brands.title")}
         </h2>
       </Container>
       <div className="mt-6 [mask-image:linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]">
         <ul className="flex w-max animate-marquee gap-5 hover:[animation-play-state:paused] motion-reduce:animate-none">
           {row.map((b, i) => (
-            <li key={i} aria-hidden={i >= brands.length} className="grid h-20 w-32 shrink-0 place-items-center overflow-hidden rounded-card bg-white ring-1 ring-border">
+            <li key={i} aria-hidden={i >= editableBrands.length} className="grid h-20 w-32 shrink-0 place-items-center overflow-hidden rounded-card bg-white ring-1 ring-border">
               <img src={b.logo} alt={b.name} className="max-h-16 max-w-28 object-contain" />
             </li>
           ))}
@@ -273,14 +283,19 @@ function BrandsMarquee() {
 }
 
 function Testimonials() {
-  const [main, ...rest] = testimonials;
+  const { text, image } = useSiteContent();
+  const [main, ...rest] = testimonials.map((_testimonial, index) => ({
+    quote: text(`testimonial.${index}.quote`),
+    name: text(`testimonial.${index}.name`),
+    detail: text(`testimonial.${index}.detail`),
+  }));
   return (
     <section className="py-14 sm:py-16">
       <Container>
-        <SectionHeading eyebrow="Familias PetCare" title="Lo que cuentan los dueños" className="reveal" />
+        <SectionHeading eyebrow={text("home.testimonials.eyebrow")} title={text("home.testimonials.title")} className="reveal" />
         <div className="mt-10 grid gap-5 lg:grid-cols-[1.35fr_1fr]">
           <figure className="reveal grid overflow-hidden rounded-media bg-sky sm:grid-cols-[0.8fr_1fr]">
-            <img src={photos.aussie} alt="Perro pastor australiano al aire libre" className="h-64 w-full object-cover sm:h-full" />
+            <img src={image("home.testimonials.image")} alt="Perro pastor australiano al aire libre" className="h-64 w-full object-cover sm:h-full" />
             <div className="flex flex-col justify-between gap-6 p-7 sm:p-9">
               <blockquote className="font-display text-2xl leading-snug font-extrabold text-primary">“{main.quote}”</blockquote>
               <figcaption>
@@ -307,14 +322,15 @@ function Testimonials() {
 }
 
 export function VisitUs() {
+  const { text } = useSiteContent();
   return (
     <section className="pb-14 sm:pb-16">
       <Container>
         <div className="reveal grid gap-10 rounded-media bg-accent-soft p-8 sm:p-12 lg:grid-cols-[1.2fr_1fr] lg:items-center">
           <div>
-            <h2 className="text-3xl leading-[1.08] font-black text-primary sm:text-4xl">Agenda la próxima visita de tu engreído</h2>
+            <h2 className="text-3xl leading-[1.08] font-black text-primary sm:text-4xl">{text("home.visit.title")}</h2>
             <p className="mt-4 max-w-[48ch] text-lg text-muted-foreground">
-              Elige un horario disponible y reserva en línea.
+              {text("home.visit.description")}
             </p>
             <ButtonLink to="/citas" size="lg" className="mt-7">
               Agendar cita
@@ -324,7 +340,7 @@ export function VisitUs() {
             <li className="flex gap-4">
               <MapPin weight="duotone" className="size-7 shrink-0 text-accent" />
               <div>
-                <p className="font-display font-extrabold">Sede Surco</p>
+                <p className="font-display font-extrabold">{text("home.visit.addressLabel")}</p>
                 <a href={business.mapsLink} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-accent">
                   {business.address}
                 </a>
@@ -333,16 +349,16 @@ export function VisitUs() {
             <li className="flex gap-4">
               <Phone weight="duotone" className="size-7 shrink-0 text-accent" />
               <div>
-                <p className="font-display font-extrabold">Teléfono</p>
-                <a href={business.phoneHref} className="text-muted-foreground hover:text-accent">{business.phone}</a>
-                <p className="text-sm text-muted-foreground">{business.hours}</p>
+                <p className="font-display font-extrabold">{text("home.visit.phoneLabel")}</p>
+                <a href={sitePhoneHref(text("global.phone"))} className="text-muted-foreground hover:text-accent">{text("global.phone")}</a>
+                <p className="text-sm text-muted-foreground">{text("global.hours")}</p>
               </div>
             </li>
             <li className="flex gap-4">
               <Siren weight="duotone" className="size-7 shrink-0 text-danger" />
               <div>
-                <p className="font-display font-extrabold">Emergencias</p>
-                <a href={business.emergencyHref} className="font-bold text-foreground hover:text-accent">{business.emergency}</a>
+                <p className="font-display font-extrabold">{text("home.visit.emergencyLabel")}</p>
+                <a href={sitePhoneHref(text("global.emergency"))} className="font-bold text-foreground hover:text-accent">{text("global.emergency")}</a>
               </div>
             </li>
           </ul>

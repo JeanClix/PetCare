@@ -4,6 +4,7 @@ import { createHashRouter, Navigate, RouterProvider } from "react-router-dom";
 import { App } from "@/App";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
+import { SiteContentProvider } from "@/context/SiteContentContext";
 import { About } from "@/pages/About";
 import { Account } from "@/pages/Account";
 import { Admin } from "@/pages/Admin";
@@ -40,9 +41,11 @@ const router = createHashRouter([
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
-      <CartProvider>
-        <RouterProvider router={router} />
-      </CartProvider>
+      <SiteContentProvider>
+        <CartProvider>
+          <RouterProvider router={router} />
+        </CartProvider>
+      </SiteContentProvider>
     </AuthProvider>
   </StrictMode>,
 );

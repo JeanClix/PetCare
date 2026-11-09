@@ -8,11 +8,10 @@ import { Container } from "@/components/ui/Container";
 import {
   categoryLabels,
   petLabels,
-  products,
   type Category,
   type Pet,
 } from "@/data/products";
-import { business } from "@/data/site";
+import { useSiteContent } from "@/context/SiteContentContext";
 
 type Sort = "recientes" | "precio-asc" | "precio-desc" | "nombre";
 
@@ -28,6 +27,8 @@ function normalize(s: string) {
 }
 
 export function Shop() {
+  const { content, text } = useSiteContent();
+  const products = content.products;
   const [params, setParams] = useSearchParams();
   const pet = (params.get("mascota") ?? "all") as Pet | "all";
   const category = (params.get("categoria") ?? "all") as Category | "all";
@@ -58,15 +59,15 @@ export function Shop() {
     if (sort === "precio-desc") list.sort((a, b) => b.price - a.price);
     if (sort === "nombre") list.sort((a, b) => a.name.localeCompare(b.name, "es"));
     return list;
-  }, [pet, category, sort, query]);
+  }, [products, pet, category, sort, query]);
 
   const hasFilters = pet !== "all" || category !== "all" || query !== "";
 
   return (
     <>
       <PageHeader
-        title="Tienda y farmacia veterinaria"
-        description="Alimentos, farmacia, higiene y accesorios para perros, gatos y exóticos, recomendados por nuestros médicos."
+        title={text("shop.page.title")}
+        description={text("shop.page.description")}
       />
 
       <Container className="py-6 sm:py-8">
@@ -152,7 +153,7 @@ export function Shop() {
         ) : (
           <div className="rounded-media bg-sky/60 px-6 py-16 text-center">
             <p className="font-display text-xl font-black">No encontramos productos</p>
-            <p className="mx-auto mt-2 max-w-md text-muted-foreground">Prueba con otros filtros o consúltanos al {business.phone}.</p>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">Prueba con otros filtros o consúltanos al {text("global.phone")}.</p>
             <Button variant="outline" size="sm" className="mt-6" onClick={() => setParams({}, { replace: true })}>
               Ver todos los productos
             </Button>

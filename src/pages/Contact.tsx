@@ -11,13 +11,16 @@ import {
   validateContact,
   type ContactErrors,
 } from "@/components/ui/Form";
-import { business, photos } from "@/data/site";
+import { business } from "@/data/site";
 import { sendPublicContact } from "@/lib/crm";
 import { whatsappLink } from "@/lib/utils";
+import { useSiteContent } from "@/context/SiteContentContext";
+import { sitePhoneHref } from "@/lib/siteContent";
 
 type FormStatus = "idle" | "sending" | "sent";
 
 export function Contact() {
+  const { text, image } = useSiteContent();
   const [errors, setErrors] = useState<ContactErrors>({});
   const [status, setStatus] = useState<FormStatus>("idle");
   const [error, setError] = useState("");
@@ -66,9 +69,9 @@ export function Contact() {
   return (
     <>
       <PageHeader
-        title="Contáctanos"
-        description="¿Tienes una consulta? Escríbenos y nuestro equipo te responderá."
-        image={{ src: photos.corgi, alt: "Corgi mirando a la cámara" }}
+        title={text("contact.page.title")}
+        description={text("contact.page.description")}
+        image={{ src: image("contact.image"), alt: "Corgi mirando a la cámara" }}
       />
 
       <Container className="grid gap-8 py-10 sm:py-14 lg:grid-cols-[1.15fr_0.85fr]">
@@ -87,8 +90,8 @@ export function Contact() {
           ) : (
             <form noValidate onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <h2 id="contact-form-title" className="font-display text-xl font-black text-primary">Envíanos un mensaje</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Completa tus datos y te responderemos pronto.</p>
+                <h2 id="contact-form-title" className="font-display text-xl font-black text-primary">{text("contact.form.title")}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{text("contact.form.description")}</p>
               </div>
               <OwnerFields errors={errors} />
               <Field label="Asunto" name="subject" hint="Opcional">
@@ -117,7 +120,7 @@ export function Contact() {
               <a href={business.mapsLink} target="_blank" rel="noopener noreferrer" className="hover:text-accent">{business.address}</a>
             </InfoRow>
             <InfoRow icon={<Phone weight="duotone" />} title="Teléfono">
-              <a href={business.phoneHref} className="hover:text-accent">{business.phone}</a>
+              <a href={sitePhoneHref(text("global.phone"))} className="hover:text-accent">{text("global.phone")}</a>
             </InfoRow>
             <InfoRow icon={<InstagramLogo weight="duotone" />} title="Instagram">
               <a href={business.instagram} target="_blank" rel="noopener noreferrer" className="hover:text-accent">@petcareperu</a>
