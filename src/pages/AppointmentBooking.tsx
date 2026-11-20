@@ -1,31 +1,29 @@
 import {
+  CalendarCheck,
   CheckCircle,
   CircleNotch,
-  Clock,
-  InstagramLogo,
-  MapPin,
+  ClipboardText,
+  PawPrint,
   PaperPlaneTilt,
-  Phone,
-  Siren,
-  WhatsappLogo,
+  ShieldCheck,
 } from "@phosphor-icons/react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
-import { Button, ButtonAnchor, ButtonLink } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import {
   ConsentFields,
   Field,
   inputClass,
 } from "@/components/ui/Form";
+import { ServiceIcon } from "@/components/icons";
 import type { Pet } from "@/data/products";
-import { business, services } from "@/data/site";
+import { services } from "@/data/site";
 import { useAuth } from "@/context/AuthContext";
 import { bookAppointment, getAppointmentSlots, type AppointmentSlot } from "@/lib/crm";
-import { whatsappLink } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useSiteContent } from "@/context/SiteContentContext";
-import { sitePhoneHref } from "@/lib/siteContent";
 
 type Status =
   | { kind: "idle" }
@@ -51,8 +49,11 @@ export function AppointmentBooking() {
   const [selectedSlotId, setSelectedSlotId] = useState("");
   const [slotsLoading, setSlotsLoading] = useState(true);
   const [slotError, setSlotError] = useState("");
+  const [petName, setPetName] = useState("");
+  const [petType, setPetType] = useState<Pet>("perro");
   const selectedService = services.find((service) => service.id === selectedServiceId);
   const serviceSlots = selectedService ? slots.filter((slot) => slot.service === selectedService.name) : [];
+  const selectedSlot = serviceSlots.find((slot) => slot.id === selectedSlotId);
 
   useEffect(() => {
     setSelectedServiceId(preselected);
@@ -130,6 +131,8 @@ export function AppointmentBooking() {
     setStatus({ kind: "sent", owner: user?.firstname || "cliente" });
     form.reset();
     setSelectedSlotId("");
+    setPetName("");
+    setPetType("perro");
   }
 
   if (!ready || !user || user.role !== "customer") {
@@ -144,82 +147,116 @@ export function AppointmentBooking() {
         image={{ src: image("appointments.image"), alt: "Corgi mirando a la cámara" }}
       />
 
-      <Container className="grid gap-10 py-14 sm:py-20 lg:grid-cols-[1.15fr_1fr]">
+      <Container className="grid gap-10 py-14 sm:py-20 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
         <div className="space-y-6">
           {status.kind === "sent" ? (
             <SentPanel owner={status.owner} onReset={() => setStatus({ kind: "idle" })} />
           ) : (
-            <form noValidate onSubmit={handleSubmit} className="h-fit space-y-5 rounded-media bg-card p-6 shadow-soft sm:p-8">
-              <p className="text-sm text-muted-foreground">Reserva para {`${user.firstname} ${user.lastname}`.trim()} · {user.email}</p>
-              <div className="border-t border-border pt-6">
-                <fieldset className="space-y-5">
-                  <legend className="mb-4 font-display text-xl font-black">Elige tu cita</legend>
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <Field label="Nombre de tu mascota" name="nombre_mascota" hint="Opcional">
-                      <input id="nombre_mascota" name="nombre_mascota" placeholder="Toby" className={inputClass} />
-                    </Field>
-                    <Field label="Es un" name="tipo_mascota">
-                      <select id="tipo_mascota" name="tipo_mascota" defaultValue="perro" className={inputClass}>
-                        {petOptions.map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Servicio" name="servicio_interes" className="sm:col-span-2">
+            <form noValidate onSubmit={handleSubmit} className="h-fit space-y-8 rounded-media bg-card p-6 shadow-soft sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-5">
+                <h2 className="font-display text-2xl font-black">Elige tu cita</h2>
+                <p className="text-sm text-muted-foreground">
+                  {`${user.firstname} ${user.lastname}`.trim()} · {user.email}
+                </p>
+              </div>
+
+              <fieldset className="space-y-4">
+                <SectionLabel icon={<PawPrint weight="fill" />}>Tu mascota</SectionLabel>
+                <div className="grid gap-5 rounded-card bg-muted/40 p-5 sm:grid-cols-2">
+                  <Field label="Nombre de tu mascota" name="nombre_mascota" hint="Opcional">
+                    <input
+                      id="nombre_mascota"
+                      name="nombre_mascota"
+                      placeholder="Toby"
+                      value={petName}
+                      onChange={(event) => setPetName(event.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field label="Es un" name="tipo_mascota">
+                    <select
+                      id="tipo_mascota"
+                      name="tipo_mascota"
+                      value={petType}
+                      onChange={(event) => setPetType(event.target.value as Pet)}
+                      className={inputClass}
+                    >
+                      {petOptions.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-4">
+                <SectionLabel icon={<CalendarCheck weight="fill" />}>Servicio y horario</SectionLabel>
+                <div className="grid gap-5 rounded-card bg-muted/40 p-5">
+                  <Field label="Servicio" name="servicio_interes">
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      {services.map((s) => {
+                        const active = s.id === selectedServiceId;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => {
+                              setSelectedServiceId(s.id);
+                              setSelectedSlotId("");
+                            }}
+                            className={cn(
+                              "flex items-center gap-3 rounded-xl border-2 bg-background px-4 py-3 text-left transition-colors",
+                              active ? "border-accent ring-2 ring-accent/20" : "border-border hover:border-accent/60",
+                            )}
+                          >
+                            <ServiceIcon name={s.icon} className="size-6 shrink-0 text-accent" />
+                            <span className="min-w-0 truncate text-sm font-bold">{text(`service.${s.id}.name`)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <input type="hidden" name="servicio_interes" value={selectedServiceId} />
+                  </Field>
+                  <Field label="Horario disponible" name="appointment_slot">
+                    {slotsLoading ? (
+                      <div className="h-12 animate-pulse rounded-xl bg-muted" />
+                    ) : (
                       <select
-                        id="servicio_interes"
-                        name="servicio_interes"
-                        value={selectedServiceId}
-                        onChange={(event) => {
-                          setSelectedServiceId(event.target.value);
-                          setSelectedSlotId("");
-                        }}
+                        id="appointment_slot"
+                        name="appointment_slot"
+                        required
+                        value={selectedSlotId}
+                        onChange={(event) => setSelectedSlotId(event.target.value)}
                         className={inputClass}
+                        disabled={serviceSlots.length === 0}
                       >
-                        {services.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {text(`service.${s.id}.name`)}
+                        <option value="" disabled>{serviceSlots.length ? "Selecciona un horario" : "No hay horarios para este servicio"}</option>
+                        {serviceSlots.map((slot) => (
+                          <option key={slot.id} value={slot.id}>
+                            {new Date(slot.startsAt).toLocaleString("es-PE", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · {slot.veterinarianName || "Personal por asignar"}
                           </option>
                         ))}
                       </select>
-                    </Field>
-                    <Field label="Horario disponible" name="appointment_slot" className="sm:col-span-2">
-                      {slotsLoading ? (
-                        <div className="h-12 animate-pulse rounded-xl bg-muted" />
-                      ) : (
-                        <select
-                          id="appointment_slot"
-                          name="appointment_slot"
-                          required
-                          value={selectedSlotId}
-                          onChange={(event) => setSelectedSlotId(event.target.value)}
-                          className={inputClass}
-                          disabled={serviceSlots.length === 0}
-                        >
-                          <option value="" disabled>{serviceSlots.length ? "Selecciona un horario" : "No hay horarios para este servicio"}</option>
-                          {serviceSlots.map((slot) => (
-                            <option key={slot.id} value={slot.id}>
-                              {new Date(slot.startsAt).toLocaleString("es-PE", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · {slot.veterinarianName || "Personal por asignar"}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      {slotError && <p role="alert" className="text-sm font-semibold text-danger">{slotError}</p>}
-                    </Field>
-                    <Field label="Celular" name="phone" hint="Para coordinar tu cita">
-                      <input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" required defaultValue={user.phone} placeholder="987 654 321" className={inputClass} />
-                    </Field>
-                    <p className="self-end text-sm text-muted-foreground">
-                      El costo lo confirmará el equipo de ventas antes de aprobar la cita.
-                    </p>
-                  </div>
+                    )}
+                    {slotError && <p role="alert" className="text-sm font-semibold text-danger">{slotError}</p>}
+                  </Field>
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-4">
+                <SectionLabel icon={<ClipboardText weight="fill" />}>Contacto y detalles</SectionLabel>
+                <div className="grid gap-5 rounded-card bg-muted/40 p-5">
+                  <Field label="Celular" name="phone" hint="Para coordinar tu cita">
+                    <input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" required defaultValue={user.phone} placeholder="987 654 321" className={inputClass} />
+                  </Field>
                   <Field label="Mensaje" name="message" hint="Opcional. Cuéntanos qué necesita tu engreído.">
                     <textarea id="message" name="message" rows={3} className={`${inputClass} h-auto resize-y py-3`} />
                   </Field>
-                </fieldset>
-              </div>
+                </div>
+              </fieldset>
 
               <ConsentFields />
 
@@ -249,46 +286,52 @@ export function AppointmentBooking() {
           )}
         </div>
 
-        <aside className="space-y-8">
-          <ul className="space-y-6">
-            <InfoRow icon={<MapPin weight="duotone" />} title="Sede Surco">
-              <a href={business.mapsLink} target="_blank" rel="noopener noreferrer" className="hover:text-accent">
-                {business.address}
-              </a>
-            </InfoRow>
-            <InfoRow icon={<Clock weight="duotone" />} title="Horario">{text("global.hours")}</InfoRow>
-            <InfoRow icon={<Phone weight="duotone" />} title="Teléfono">
-              <a href={sitePhoneHref(text("global.phone"))} className="hover:text-accent">{text("global.phone")}</a>
-            </InfoRow>
-            <InfoRow icon={<InstagramLogo weight="duotone" />} title="Instagram">
-              <a href={business.instagram} target="_blank" rel="noopener noreferrer" className="hover:text-accent">
-                @petcareperu
-              </a>
-            </InfoRow>
-          </ul>
-
-          <div className="rounded-media bg-accent-soft p-6">
+        <aside className="lg:sticky lg:top-24">
+          <div className="space-y-6 rounded-media bg-primary p-6 text-primary-foreground shadow-soft sm:p-7">
             <p className="flex items-center gap-2 font-display text-lg font-black">
-              <Siren weight="fill" className="size-6 text-danger" /> ¿Es una emergencia?
+              <ClipboardText weight="fill" className="size-6" /> Resumen de tu cita
             </p>
-            <p className="mt-1.5 text-muted-foreground">Llámanos y te atiende una persona de nuestro equipo.</p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <ButtonAnchor href={sitePhoneHref(text("global.emergency"))} target="_self">
-                <Phone weight="bold" /> {text("global.emergency")}
-              </ButtonAnchor>
-              <ButtonAnchor href={whatsappLink("Hola PetCare, tengo una emergencia con mi mascota.")} variant="whatsapp">
-                <WhatsappLogo weight="fill" /> WhatsApp
-              </ButtonAnchor>
-            </div>
-          </div>
 
-          <iframe
-            title="Ubicación de PetCare en Google Maps"
-            src={business.mapsEmbed}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            className="h-64 w-full rounded-media border-0 shadow-soft"
-          />
+            <div className="flex items-start gap-3 border-t border-white/15 pt-5">
+              {selectedService && <ServiceIcon name={selectedService.icon} className="size-7 shrink-0 text-accent" />}
+              <div className="min-w-0">
+                <p className="text-xs font-bold tracking-wide text-primary-foreground/60 uppercase">Servicio</p>
+                <p className="truncate font-display font-black">{selectedService ? text(`service.${selectedService.id}.name`) : "—"}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <PawPrint weight="fill" className="size-7 shrink-0 text-accent" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold tracking-wide text-primary-foreground/60 uppercase">Mascota</p>
+                <p className="truncate font-display font-black">
+                  {petName || "Sin nombre"} · {petOptions.find(([v]) => v === petType)?.[1]}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <CalendarCheck weight="fill" className="size-7 shrink-0 text-accent" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold tracking-wide text-primary-foreground/60 uppercase">Horario</p>
+                {selectedSlot ? (
+                  <>
+                    <p className="font-display font-black">
+                      {new Date(selectedSlot.startsAt).toLocaleString("es-PE", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                    <p className="text-sm text-primary-foreground/70">{selectedSlot.veterinarianName || "Personal por asignar"}</p>
+                  </>
+                ) : (
+                  <p className="font-display font-black text-primary-foreground/60">Por elegir</p>
+                )}
+              </div>
+            </div>
+
+            <p className="flex items-start gap-2 border-t border-white/15 pt-5 text-sm text-primary-foreground/70">
+              <ShieldCheck weight="fill" className="mt-0.5 size-5 shrink-0 text-accent" />
+              El costo lo confirmará el equipo de ventas antes de aprobar la cita. Verás el estado y el detalle en tu cuenta.
+            </p>
+          </div>
         </aside>
       </Container>
     </>
@@ -321,14 +364,11 @@ function SentPanel({
   );
 }
 
-function InfoRow({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+function SectionLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <li className="flex gap-4">
-      <span className="text-accent [&_svg]:size-7">{icon}</span>
-      <div>
-        <p className="font-display font-extrabold">{title}</p>
-        <p className="text-muted-foreground">{children}</p>
-      </div>
-    </li>
+    <p className="flex items-center gap-2 font-display text-sm font-black tracking-wide text-accent uppercase">
+      <span className="[&_svg]:size-5">{icon}</span>
+      {children}
+    </p>
   );
 }
