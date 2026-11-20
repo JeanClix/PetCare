@@ -258,7 +258,8 @@ function hashPassword(password: string, salt = randomBytes(16).toString("hex")) 
 }
 
 function accountRole(value: unknown): AccountRole | null {
-  return ACCOUNT_ROLES.includes(value as AccountRole) ? value as AccountRole : null;
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : value;
+  return ACCOUNT_ROLES.includes(normalized as AccountRole) ? (normalized as AccountRole) : null;
 }
 
 function verifyPassword(password: string, stored: string) {
@@ -1896,17 +1897,20 @@ export default {
           FROM petcare_users
           ORDER BY created_at DESC, lower(email)
         `;
-        const accounts = rows.map((row) => {
+        const accounts = rows.flatMap((row) => {
           const role = accountRole(row.role);
-          if (!role) throw new Error("La base de datos contiene un rol de cuenta inválido.");
-          return {
+          if (!role) {
+            console.warn(`Cuenta ${row.id} tiene un rol inválido en la base de datos: ${JSON.stringify(row.role)}`);
+            return [];
+          }
+          return [{
             id: String(row.id),
             firstname: String(row.firstname),
             lastname: String(row.lastname),
             email: String(row.email),
             role,
             createdAt: new Date(String(row.createdAt)).toISOString(),
-          };
+          }];
         });
         return response({
           accounts,
