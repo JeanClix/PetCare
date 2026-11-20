@@ -38,8 +38,9 @@ export function AttendanceForm({ token, onClose, onSaved, appointment, petId, ow
     const parsed = parseAppointmentPet(appointment?.pet);
     return { ...emptyPet, name: parsed.name, species: parsed.species };
   });
+  // Si viene de una cita, la fecha/hora de atención parte de la fecha agendada, no de "ahora".
   const [visit, setVisit] = useState({
-    visitedAt: localDateTime(),
+    visitedAt: appointment?.scheduledAt ? localDateTime(new Date(appointment.scheduledAt)) : localDateTime(),
     reason: appointment?.service ?? "",
     weightKg: "",
     temperatureC: "",
@@ -72,6 +73,10 @@ export function AttendanceForm({ token, onClose, onSaved, appointment, petId, ow
 
   const owner = owners.find((item) => item.id === selectedOwnerId);
   const ownerFixed = Boolean(appointment || ownerId);
+  // El máximo normalmente es "ahora" (no se registra una atención futura), salvo que la cita
+  // agendada ya sea posterior a ahora: en ese caso el máximo se extiende hasta esa fecha/hora.
+  const scheduledDate = appointment?.scheduledAt ? new Date(appointment.scheduledAt) : null;
+  const maxVisitedAt = scheduledDate && scheduledDate > new Date() ? localDateTime(scheduledDate) : localDateTime();
 
   const setField = (key: keyof typeof visit, value: string) => setVisit((current) => ({ ...current, [key]: value }));
 
@@ -161,7 +166,7 @@ export function AttendanceForm({ token, onClose, onSaved, appointment, petId, ow
         <FormSection title="Atención">
           <div className="grid gap-4 sm:grid-cols-2">
             <StaffField label="Fecha y hora" htmlFor="visit-date">
-              <input id="visit-date" type="datetime-local" required max={localDateTime()} value={visit.visitedAt} onChange={(e) => setField("visitedAt", e.target.value)} className={staffInput} />
+              <input id="visit-date" type="datetime-local" required max={maxVisitedAt} value={visit.visitedAt} onChange={(e) => setField("visitedAt", e.target.value)} className={staffInput} />
             </StaffField>
             <StaffField label="Motivo de consulta" htmlFor="visit-reason">
               <input id="visit-reason" required maxLength={300} value={visit.reason} onChange={(e) => setField("reason", e.target.value)} placeholder="Control, vacuna, vómitos…" className={staffInput} />
