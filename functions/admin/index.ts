@@ -51,8 +51,8 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 // Qué secciones del panel interno puede usar cada rol de staff
 const STAFF_PERMISSIONS: Record<Exclude<AccountRole, "customer">, ReadonlySet<string>> = {
   admin: new Set([
-    "accounts", "account-role", "read", "appointments", "appointment-status", "appointment-slots",
-    "appointment-slot-create", "appointment-slot-cancel", "marketing-test-send", "marketing-send",
+    "accounts", "account-role", "update-account", "read", "appointments", "appointment-status", "appointment-slots",
+    "appointment-slot-create", "appointment-slot-cancel", "update-appointment-slot", "marketing-test-send", "marketing-send",
     "lifecycle", "contact-notes", "message-status", "lead-status", "clear", "import-lead", "purchase-create",
     ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS, "whatsapp-status", "whatsapp-logout",
     ...SOCIAL_ADMIN_ACTIONS, ...SITE_ADMIN_ACTIONS,
@@ -63,7 +63,7 @@ const STAFF_PERMISSIONS: Record<Exclude<AccountRole, "customer">, ReadonlySet<st
   ]),
   veterinarian: new Set([
     "appointments", "appointment-status", "appointment-slots", "appointment-slot-create", "appointment-slot-cancel",
-    ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS,
+    "update-appointment-slot", ...CLINIC_ACTIONS, ...WHATSAPP_SEND_ACTIONS,
   ]),
 };
 
@@ -1447,6 +1447,8 @@ export default {
     try {
       await ensureSchema(sql);
       if (action === "appointment-slots") {
+        // Los veterinarios solo deben ver los cupos que ellos mismos publicaron o que
+        // ya tienen asignados; el resto del personal (admin) y los clientes ven todos los disponibles.
         const veterinarianId = activeSession.role === "veterinarian" ? activeSession.id : null;
         const slots = await sql`
           SELECT s.id, s.starts_at AS "startsAt", s.ends_at AS "endsAt", s.status,
@@ -1458,7 +1460,11 @@ export default {
           WHERE s.starts_at >= now()
             AND s.starts_at < now() + interval '90 days'
             AND s.status <> 'cancelled'
-            AND (${veterinarianId}::uuid IS NULL OR s.veterinarian_id IS NULL OR s.veterinarian_id = ${veterinarianId}::uuid)
+            AND (
+              ${veterinarianId}::uuid IS NULL
+              OR s.veterinarian_id = ${veterinarianId}::uuid
+              OR s.created_by_id = ${veterinarianId}::uuid
+            )
             AND (${activeSession.role !== "customer"} OR s.status = 'available')
           ORDER BY s.starts_at
           LIMIT 300
@@ -1671,10 +1677,80 @@ export default {
         const cancelled = await sql`
           UPDATE petcare_appointment_slots SET status = 'cancelled'
           WHERE id = ${slotId}::uuid AND status = 'available' AND starts_at > now()
-            AND (${veterinarianId}::uuid IS NULL OR veterinarian_id = ${veterinarianId}::uuid)
+            AND (
+              ${veterinarianId}::uuid IS NULL
+              OR veterinarian_id = ${veterinarianId}::uuid
+              OR created_by_id = ${veterinarianId}::uuid
+            )
           RETURNING id
         `;
         if (!cancelled.length) return response({ error: "Solo se pueden quitar horarios disponibles y futuros." }, 409, origin);
+        return response({ ok: true }, 200, origin);
+      }
+      if (action === "update-appointment-slot") {
+        if (activeSession.role !== "admin" && activeSession.role !== "veterinarian") {
+          return response({ error: "Solo administración y veterinarios pueden cambiar la disponibilidad." }, 403, origin);
+        }
+        const slotId = text(body?.id, 36);
+        if (!UUID_PATTERN.test(slotId)) return response({ error: "Horario inválido." }, 400, origin);
+        const startsAt = text(body?.startsAt, 40);
+        const endsAt = text(body?.endsAt, 40);
+        const service = text(body?.service, 200);
+        const start = Date.parse(startsAt);
+        const end = Date.parse(endsAt);
+        const duration = end - start;
+        if (
+          !Number.isFinite(start) || !Number.isFinite(end) || start <= Date.now() || !service ||
+          start > Date.now() + 90 * 24 * 60 * 60 * 1000 ||
+          duration < 15 * 60 * 1000 || duration > 4 * 60 * 60 * 1000
+        ) {
+          return response({ error: "El horario debe durar entre 15 minutos y 4 horas, dentro de los próximos 90 días." }, 400, origin);
+        }
+        // Un veterinario solo puede editar sus propios cupos (los que publicó o tiene asignados)
+        // y no puede reasignarlos a otro profesional; solo administración puede hacerlo.
+        let nextVeterinarianId: string | null;
+        if (activeSession.role === "veterinarian") {
+          nextVeterinarianId = activeSession.id;
+        } else {
+          const rawVeterinarianId = text(body?.veterinarianId, 36);
+          nextVeterinarianId = rawVeterinarianId || null;
+          if (nextVeterinarianId && !UUID_PATTERN.test(nextVeterinarianId)) {
+            return response({ error: "Elige un veterinario válido." }, 400, origin);
+          }
+          if (nextVeterinarianId) {
+            const veterinarian = await sql`
+              SELECT id FROM petcare_users WHERE id = ${nextVeterinarianId}::uuid AND role = 'veterinarian' LIMIT 1
+            `;
+            if (!veterinarian.length) return response({ error: "No se encontró la cuenta del veterinario." }, 404, origin);
+          }
+        }
+        const ownerFilterId = activeSession.role === "veterinarian" ? activeSession.id : null;
+        const updated = await sql`
+          UPDATE petcare_appointment_slots
+          SET starts_at = ${new Date(start).toISOString()}, ends_at = ${new Date(end).toISOString()},
+            service = ${service}, veterinarian_id = ${nextVeterinarianId}::uuid
+          WHERE id = ${slotId}::uuid AND status = 'available' AND starts_at > now()
+            AND NOT EXISTS (
+              SELECT 1 FROM petcare_appointment_slots other
+              WHERE other.id <> ${slotId}::uuid
+                AND other.status <> 'cancelled'
+                AND other.starts_at < ${new Date(end).toISOString()}
+                AND other.ends_at > ${new Date(start).toISOString()}
+                AND (
+                  other.service = ${service}
+                  OR (${nextVeterinarianId}::uuid IS NOT NULL AND other.veterinarian_id = ${nextVeterinarianId}::uuid)
+                )
+            )
+            AND (
+              ${ownerFilterId}::uuid IS NULL
+              OR veterinarian_id = ${ownerFilterId}::uuid
+              OR created_by_id = ${ownerFilterId}::uuid
+            )
+          RETURNING id
+        `;
+        if (!updated.length) {
+          return response({ error: "No se pudo editar el horario: ya fue reservado, venció, o se cruza con otro cupo." }, 409, origin);
+        }
         return response({ ok: true }, 200, origin);
       }
       if (action === "social-status") {
@@ -1916,7 +1992,7 @@ export default {
       }
       if (action === "accounts") {
         const rows = await sql`
-          SELECT id, firstname, lastname, email, role, created_at AS "createdAt"
+          SELECT id, firstname, lastname, email, phone, role, created_at AS "createdAt"
           FROM petcare_users
           ORDER BY created_at DESC, lower(email)
         `;
@@ -1931,6 +2007,7 @@ export default {
             firstname: String(row.firstname),
             lastname: String(row.lastname),
             email: String(row.email),
+            phone: row.phone ? String(row.phone) : "",
             role,
             createdAt: new Date(String(row.createdAt)).toISOString(),
           }];
@@ -1956,7 +2033,32 @@ export default {
         if (!updated.length) return response({ error: "No se encontró la cuenta." }, 404, origin);
         return response({ ok: true }, 200, origin);
       }
+      if (action === "update-account") {
+        const id = text(body?.id, 36);
+        if (!UUID_PATTERN.test(id)) return response({ error: "Cuenta inválida." }, 400, origin);
+        const firstname = text(body?.firstname, 100);
+        const lastname = text(body?.lastname, 100);
+        const phone = text(body?.phone, 30);
+        const email = text(body?.email, 200).trim().toLowerCase();
+        if (!firstname || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+          return response({ error: "Completa el nombre y un correo válido." }, 400, origin);
+        }
+        const duplicate = await sql`
+          SELECT id FROM petcare_users WHERE lower(email) = ${email} AND id <> ${id}::uuid LIMIT 1
+        `;
+        if (duplicate.length) return response({ error: "Ya existe otra cuenta con ese correo." }, 409, origin);
+        const updated = await sql`
+          UPDATE petcare_users SET firstname = ${firstname}, lastname = ${lastname}, phone = ${phone}, email = ${email}
+          WHERE id = ${id}::uuid
+          RETURNING id
+        `;
+        if (!updated.length) return response({ error: "No se encontró la cuenta." }, 404, origin);
+        return response({ ok: true }, 200, origin);
+      }
       if (action === "appointments") {
+        // Un veterinario solo debe ver las citas que tiene asignadas (por el veterinario del cupo);
+        // administración y ventas coordinan la agenda completa y ven todas.
+        const veterinarianId = activeSession.role === "veterinarian" ? activeSession.id : null;
         const appointments = await sql`
           SELECT l.id, l.contact_id AS "contactId",
             concat_ws(' ', c.firstname, c.lastname) AS owner, c.email, c.phone,
@@ -1973,6 +2075,7 @@ export default {
             WHERE appointment_id = l.id ORDER BY created_at DESC LIMIT 1
           ) r ON true
           WHERE l.type = 'appointment'
+            AND (${veterinarianId}::uuid IS NULL OR s.veterinarian_id = ${veterinarianId}::uuid)
           ORDER BY l.created_at DESC
           LIMIT 500
         `;

@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
+import { NotePencil, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import {
   accountRoles,
   getManagedAccounts,
   roleLabels,
   setManagedAccountRole,
+  updateManagedAccount,
   type AccountRole,
   type ManagedAccount,
 } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
+
+type AccountDraft = { firstname: string; lastname: string; email: string; phone: string };
 
 const roleDescriptions: Record<AccountRole, string> = {
   customer: "Compra en la tienda y gestiona su cuenta.",
@@ -25,6 +29,9 @@ export function AdminAccounts({ token, currentEmail }: { token: string; currentE
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<AccountDraft | null>(null);
+  const [editError, setEditError] = useState("");
 
   async function loadAccounts() {
     setLoading(true);
@@ -57,6 +64,44 @@ export function AdminAccounts({ token, currentEmail }: { token: string; currentE
       setMessage(`Se actualizó el rol de ${account.email}.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo actualizar el rol.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  function startEditing(account: ManagedAccount) {
+    setEditingId(account.id);
+    setEditError("");
+    setEditDraft({ firstname: account.firstname, lastname: account.lastname, email: account.email, phone: account.phone });
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setEditDraft(null);
+    setEditError("");
+  }
+
+  async function saveEdit(account: ManagedAccount) {
+    if (!editDraft) return;
+    if (!editDraft.firstname.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(editDraft.email.trim())) {
+      setEditError("Completa el nombre y un correo válido.");
+      return;
+    }
+    setSavingId(account.id);
+    setEditError("");
+    try {
+      const patch = {
+        firstname: editDraft.firstname.trim(),
+        lastname: editDraft.lastname.trim(),
+        email: editDraft.email.trim().toLowerCase(),
+        phone: editDraft.phone.trim(),
+      };
+      await updateManagedAccount(token, account.id, patch);
+      setAccounts((current) => current.map((item) => item.id === account.id ? { ...item, ...patch } : item));
+      setMessage(`Se actualizaron los datos de ${patch.email}.`);
+      cancelEditing();
+    } catch (cause) {
+      setEditError(cause instanceof Error ? cause.message : "No se pudieron guardar los cambios.");
     } finally {
       setSavingId(null);
     }
@@ -116,11 +161,65 @@ export function AdminAccounts({ token, currentEmail }: { token: string; currentE
               {visibleAccounts.map((account) => {
                 const role = drafts[account.id] ?? account.role;
                 const isSelf = account.email === currentEmail;
+                const isEditing = editingId === account.id;
+                if (isEditing && editDraft) {
+                  return (
+                    <tr key={account.id} className="bg-accent-soft/40">
+                      <td className="px-4 py-4" colSpan={4}>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          <label className="grid gap-1 text-xs font-bold text-muted-foreground">Nombre
+                            <input
+                              value={editDraft.firstname}
+                              onChange={(event) => setEditDraft((current) => current && { ...current, firstname: event.target.value })}
+                              className="h-10 rounded-lg border border-border bg-background px-3 text-sm font-normal text-foreground"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-bold text-muted-foreground">Apellido
+                            <input
+                              value={editDraft.lastname}
+                              onChange={(event) => setEditDraft((current) => current && { ...current, lastname: event.target.value })}
+                              className="h-10 rounded-lg border border-border bg-background px-3 text-sm font-normal text-foreground"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-bold text-muted-foreground">Correo
+                            <input
+                              type="email"
+                              value={editDraft.email}
+                              onChange={(event) => setEditDraft((current) => current && { ...current, email: event.target.value })}
+                              className="h-10 rounded-lg border border-border bg-background px-3 text-sm font-normal text-foreground"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-bold text-muted-foreground">Teléfono
+                            <input
+                              value={editDraft.phone}
+                              onChange={(event) => setEditDraft((current) => current && { ...current, phone: event.target.value })}
+                              className="h-10 rounded-lg border border-border bg-background px-3 text-sm font-normal text-foreground"
+                            />
+                          </label>
+                        </div>
+                        {editError && <p role="alert" className="mt-2 text-sm font-semibold text-danger">{editError}</p>}
+                        <div className="mt-3 flex gap-2">
+                          <Button size="sm" disabled={savingId === account.id} onClick={() => void saveEdit(account)}>
+                            {savingId === account.id ? "Guardando..." : "Guardar datos"}
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={cancelEditing}
+                            className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-sm font-bold text-muted-foreground hover:bg-muted"
+                          >
+                            <X weight="bold" className="size-4" /> Cancelar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
                 return (
                   <tr key={account.id}>
                     <td className="px-4 py-4">
                       <p className="font-bold">{`${account.firstname} ${account.lastname}`.trim()}</p>
                       <p className="text-muted-foreground">{account.email}</p>
+                      {account.phone && <p className="text-xs text-muted-foreground">{account.phone}</p>}
                     </td>
                     <td className="px-4 py-4 text-muted-foreground">
                       {new Date(account.createdAt).toLocaleDateString("es-PE")}
@@ -142,13 +241,23 @@ export function AdminAccounts({ token, currentEmail }: { token: string; currentE
                       </select>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <Button
-                        size="sm"
-                        disabled={role === account.role || savingId !== null}
-                        onClick={() => void saveRole(account)}
-                      >
-                        {savingId === account.id ? "Guardando..." : "Guardar"}
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEditing(account)}
+                          aria-label={`Editar datos de ${account.email}`}
+                          className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent-soft hover:text-accent"
+                        >
+                          <NotePencil weight="bold" className="size-4" />
+                        </button>
+                        <Button
+                          size="sm"
+                          disabled={role === account.role || savingId !== null}
+                          onClick={() => void saveRole(account)}
+                        >
+                          {savingId === account.id ? "Guardando..." : "Guardar"}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );

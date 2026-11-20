@@ -411,6 +411,13 @@ export async function cancelAppointmentSlot(token: string, id: string) {
   await adminRequest("/appointment-slot-cancel", { id }, token);
 }
 
+export async function updateAppointmentSlot(
+  token: string,
+  slot: { id: string; startsAt: string; endsAt: string; service: string; veterinarianId?: string },
+) {
+  await adminRequest("/update-appointment-slot", slot, token);
+}
+
 export async function bookAppointment(
   token: string,
   appointment: {

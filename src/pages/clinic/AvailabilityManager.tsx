@@ -1,4 +1,4 @@
-import { CalendarBlank, CircleNotch, Plus, Trash } from "@phosphor-icons/react";
+import { CalendarBlank, CircleNotch, NotePencil, Plus, Trash, X } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { services } from "@/data/site";
@@ -7,6 +7,7 @@ import {
   cancelAppointmentSlot,
   createAppointmentSlot,
   getAppointmentSlots,
+  updateAppointmentSlot,
   type AppointmentSlot,
 } from "@/lib/crm";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,15 @@ function slotDate(value: string) {
   });
 }
 
+/** Convierte un ISO (UTC) al formato que espera <input type="datetime-local"> en hora local. */
+function toLocalInputValue(iso: string) {
+  const date = new Date(iso);
+  const offsetMs = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+type SlotDraft = { startsAt: string; endsAt: string; serviceId: string; veterinarianId: string };
+
 export function AvailabilityManager({ token, role }: { token: string; role: StaffRole }) {
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
   const [veterinarians, setVeterinarians] = useState<ManagedAccount[]>([]);
@@ -33,6 +43,10 @@ export function AvailabilityManager({ token, role }: { token: string; role: Staf
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<SlotDraft | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -97,6 +111,56 @@ export function AvailabilityManager({ token, role }: { token: string; role: Staf
       setSlots((current) => current.filter((entry) => entry.id !== slot.id));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo quitar el horario.");
+    }
+  }
+
+  function startEditing(slot: AppointmentSlot) {
+    const matchedService = services.find((entry) => entry.name === slot.service);
+    setEditingId(slot.id);
+    setEditError("");
+    setEditDraft({
+      startsAt: toLocalInputValue(slot.startsAt),
+      endsAt: toLocalInputValue(slot.endsAt),
+      serviceId: matchedService?.id ?? services[0]?.id ?? "",
+      veterinarianId: slot.veterinarianId ?? "",
+    });
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setEditDraft(null);
+    setEditError("");
+  }
+
+  async function saveEdit(slot: AppointmentSlot) {
+    if (!editDraft) return;
+    const start = new Date(editDraft.startsAt);
+    const end = new Date(editDraft.endsAt);
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start <= new Date() || end <= start) {
+      setEditError("Elige un inicio futuro y una hora final posterior.");
+      return;
+    }
+    const service = services.find((entry) => entry.id === editDraft.serviceId);
+    if (!service) {
+      setEditError("Selecciona el servicio para este horario.");
+      return;
+    }
+    setEditSaving(true);
+    setEditError("");
+    try {
+      await updateAppointmentSlot(token, {
+        id: slot.id,
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+        service: service.name,
+        ...(role === "admin" ? { veterinarianId: editDraft.veterinarianId } : {}),
+      });
+      cancelEditing();
+      await refresh();
+    } catch (cause) {
+      setEditError(cause instanceof Error ? cause.message : "No se pudo editar el horario.");
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -188,26 +252,110 @@ export function AvailabilityManager({ token, role }: { token: string; role: Staf
       ) : (
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {slots.map((slot) => (
-            <li key={slot.id} className="flex items-start justify-between gap-3 rounded-card border border-border bg-card p-4">
-              <div className="min-w-0">
-                <p className="font-bold text-primary">{slot.service}</p>
-                <p className="mt-1 font-semibold capitalize text-primary">{slotDate(slot.startsAt)}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Hasta {new Date(slot.endsAt).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</p>
-                <p className="mt-2 text-sm text-muted-foreground">{slot.veterinarianName || "Sin veterinario asignado"}</p>
-                <span className={cn(
-                  "mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold",
-                  slot.status === "available" ? "bg-accent-soft text-accent" : "bg-muted text-muted-foreground",
-                )}>{statusLabels[slot.status]}</span>
-              </div>
-              {slot.status === "available" && (
-                <button
-                  type="button"
-                  onClick={() => void removeSlot(slot)}
-                  aria-label="Quitar horario"
-                  className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+            <li key={slot.id} className="rounded-card border border-border bg-card p-4">
+              {editingId === slot.id && editDraft ? (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveEdit(slot);
+                  }}
+                  className="space-y-3"
                 >
-                  <Trash weight="bold" className="size-4" />
-                </button>
+                  <p className="text-sm font-bold text-primary">Editar horario</p>
+                  <label className="block space-y-1 text-xs font-bold text-muted-foreground">
+                    <span>Desde</span>
+                    <input
+                      required
+                      type="datetime-local"
+                      value={editDraft.startsAt}
+                      onChange={(event) => setEditDraft((current) => current && { ...current, startsAt: event.target.value })}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="block space-y-1 text-xs font-bold text-muted-foreground">
+                    <span>Hasta</span>
+                    <input
+                      required
+                      type="datetime-local"
+                      value={editDraft.endsAt}
+                      onChange={(event) => setEditDraft((current) => current && { ...current, endsAt: event.target.value })}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="block space-y-1 text-xs font-bold text-muted-foreground">
+                    <span>Servicio</span>
+                    <select
+                      required
+                      value={editDraft.serviceId}
+                      onChange={(event) => setEditDraft((current) => current && { ...current, serviceId: event.target.value })}
+                      className={inputClass}
+                    >
+                      {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+                    </select>
+                  </label>
+                  {role === "admin" && (
+                    <label className="block space-y-1 text-xs font-bold text-muted-foreground">
+                      <span>Veterinario</span>
+                      <select
+                        value={editDraft.veterinarianId}
+                        onChange={(event) => setEditDraft((current) => current && { ...current, veterinarianId: event.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="">Sin asignar</option>
+                        {veterinarians.map((vet) => (
+                          <option key={vet.id} value={vet.id}>{`${vet.firstname} ${vet.lastname}`.trim() || vet.email}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {editError && <p role="alert" className="text-xs font-semibold text-danger">{editError}</p>}
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" disabled={editSaving} className="flex-1">
+                      {editSaving ? <CircleNotch weight="bold" className="animate-spin" /> : null} Guardar
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={cancelEditing}
+                      aria-label="Cancelar edición"
+                      className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+                    >
+                      <X weight="bold" className="size-4" />
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-primary">{slot.service}</p>
+                    <p className="mt-1 font-semibold capitalize text-primary">{slotDate(slot.startsAt)}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Hasta {new Date(slot.endsAt).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{slot.veterinarianName || "Sin veterinario asignado"}</p>
+                    <span className={cn(
+                      "mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold",
+                      slot.status === "available" ? "bg-accent-soft text-accent" : "bg-muted text-muted-foreground",
+                    )}>{statusLabels[slot.status]}</span>
+                  </div>
+                  {slot.status === "available" && (
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEditing(slot)}
+                        aria-label="Editar horario"
+                        className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent-soft hover:text-accent"
+                      >
+                        <NotePencil weight="bold" className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeSlot(slot)}
+                        aria-label="Quitar horario"
+                        className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                      >
+                        <Trash weight="bold" className="size-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </li>
           ))}

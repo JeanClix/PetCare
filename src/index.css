@@ -138,6 +138,24 @@
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
   }
+
+  /* Selects nativos: quitamos la flecha del sistema operativo y dibujamos
+     una propia, consistente con el resto de los controles del sitio. */
+  select {
+    appearance: none;
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%234b5d78' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    padding-right: 2.25rem !important;
+  }
+  .dark select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23a3b3cb' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 @layer utilities {

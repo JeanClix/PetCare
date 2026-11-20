@@ -106,7 +106,9 @@ export function PurchaseRegister({
           <div>
             <h2 className="font-display text-lg font-black text-primary">Registrar compra confirmada</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Guarda las ventas realizadas. Los pedidos de la tienda se mantienen aparte hasta confirmar la compra.
+              Usa esto solo para ventas que NO se hicieron en la tienda online de la página (por ejemplo, en el local, por
+              teléfono o por WhatsApp). Los pedidos hechos desde la tienda ya quedan guardados automáticamente en
+              "Pedidos y solicitudes".
             </p>
           </div>
         </div>

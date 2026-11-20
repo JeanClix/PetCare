@@ -135,6 +135,7 @@ export type ManagedAccount = {
   firstname: string;
   lastname: string;
   email: string;
+  phone: string;
   role: AccountRole;
   createdAt: string;
 };
@@ -150,6 +151,14 @@ export async function setManagedAccountRole(
   role: ManagedAccount["role"],
 ) {
   return adminRequest<{ ok: true }>("/account-role", { id, role }, token);
+}
+
+export async function updateManagedAccount(
+  token: string,
+  id: string,
+  patch: { firstname: string; lastname: string; email: string; phone: string },
+) {
+  return adminRequest<{ ok: true }>("/update-account", { id, ...patch }, token);
 }
 
 export async function verifyAccountSession(token: string, email: string) {

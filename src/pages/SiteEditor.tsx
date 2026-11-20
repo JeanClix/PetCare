@@ -9,6 +9,59 @@ import type { Product } from "@/data/products";
 
 const sections = ["Inicio", "Servicios", "Tienda", "Nosotros", "Contacto", "Citas", "Cuenta", "Otros", "Información pública"];
 
+// Agrupa los campos de texto por bloque de la página para que secciones largas (como "Inicio")
+// no se vean como una lista plana de 50+ campos sin relación aparente entre ellos.
+const FIELD_GROUP_LABELS: Record<string, string> = {
+  "home.hero": "Portada principal",
+  "home.highlights": "Datos destacados",
+  "home.services": "Servicios en la portada",
+  "home.travel": "Sección de viajes",
+  "home.products": "Productos destacados",
+  "home.brands": "Marcas que trabajamos",
+  "brand": "Marcas que trabajamos",
+  "home.testimonials": "Testimonios",
+  "testimonial": "Testimonios",
+  "home.visit": "Cómo visitarnos",
+  "about.page": "Encabezado de la página",
+  "about.intro": "Nuestra historia",
+  "about.values": "Nuestros valores",
+  "about.value": "Nuestros valores",
+  "services.page": "Encabezado de la página",
+  "services.travel": "Servicio de viajes",
+  "service": "Servicios por tipo",
+  "shop.page": "Encabezado de la página",
+  "contact.page": "Encabezado de la página",
+  "contact.form": "Formulario de contacto",
+  "appointments.page": "Encabezado de la página",
+  "account.page": "Encabezado de la página",
+  "account.login": "Inicio de sesión",
+  "account.register": "Registro",
+  "account.email": "Campos del formulario",
+  "account.username": "Campos del formulario",
+  "account.password": "Campos del formulario",
+  "notFound": "Página no encontrada",
+  "global.nav": "Menú de navegación",
+  global: "Datos de contacto generales",
+};
+
+function fieldGroupLabel(key: string) {
+  const segments = key.split(".");
+  for (let length = 2; length >= 1; length -= 1) {
+    const prefix = segments.slice(0, length).join(".");
+    if (FIELD_GROUP_LABELS[prefix]) return FIELD_GROUP_LABELS[prefix];
+  }
+  return "Otros textos";
+}
+
+function groupFields<T extends { key: string }>(fields: T[]) {
+  const groups = new Map<string, T[]>();
+  for (const field of fields) {
+    const label = fieldGroupLabel(field.key);
+    groups.set(label, [...(groups.get(label) ?? []), field]);
+  }
+  return [...groups.entries()];
+}
+
 function isSafeImageSource(source: string) {
   try {
     const url = new URL(source, window.location.origin);
@@ -187,49 +240,63 @@ export function SiteEditor({ token }: { token: string }) {
       )}
 
       {textFields.length > 0 && (
-        <section className="grid gap-4 rounded-media border border-border bg-card p-5 shadow-soft md:grid-cols-2" aria-label={`Textos de ${section}`}>
-          {textFields.map((field) => (
-            <label key={field.key} className="grid gap-1.5 text-sm font-bold text-foreground">
-              {field.label}
-              <textarea
-                rows={draft.texts[field.key].length > 100 ? 3 : 2}
-                maxLength={3000}
-                disabled={loading || !!loadError}
-                value={draft.texts[field.key]}
-                onChange={(event) => updateText(field.key, event.target.value)}
-                className="min-h-12 w-full resize-y rounded-xl border border-border bg-background px-3 py-2 font-normal focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-              />
-            </label>
+        <div className="space-y-4" aria-label={`Textos de ${section}`}>
+          {groupFields(textFields).map(([groupLabel, fields]) => (
+            <section key={groupLabel} className="rounded-media border border-border bg-card p-5 shadow-soft">
+              <h3 className="mb-3 text-xs font-bold tracking-wide text-accent uppercase">{groupLabel}</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                {fields.map((field) => (
+                  <label key={field.key} className="grid gap-1.5 text-sm font-bold text-foreground">
+                    {field.label}
+                    <textarea
+                      rows={draft.texts[field.key].length > 100 ? 3 : 2}
+                      maxLength={3000}
+                      disabled={loading || !!loadError}
+                      value={draft.texts[field.key]}
+                      onChange={(event) => updateText(field.key, event.target.value)}
+                      className="min-h-12 w-full resize-y rounded-xl border border-border bg-background px-3 py-2 font-normal focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
           ))}
-        </section>
+        </div>
       )}
 
       {imageFields.length > 0 && (
-        <section className="grid gap-4 rounded-media border border-border bg-card p-5 shadow-soft md:grid-cols-2" aria-label={`Imágenes de ${section}`}>
-          {imageFields.map((field) => {
-            const source = draft.images[field.key];
-            return (
-              <div key={field.key} className="space-y-3 rounded-xl border border-border p-4">
-                <label className="grid gap-1.5 text-sm font-bold text-foreground">
-                  <span className="flex items-center gap-2"><ImageSquare weight="duotone" className="size-5 text-accent" />{field.label}</span>
-                  <input
-                    type="url"
-                    value={source}
-                    disabled={loading || !!loadError}
-                    onChange={(event) => updateImage(field.key, event.target.value)}
-                    placeholder="https://..."
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 font-normal focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  />
-                </label>
-                <label className="inline-flex cursor-pointer items-center rounded-full border border-border px-4 py-2 text-sm font-bold hover:border-accent">
-                  {uploadingImage === field.key ? "Subiendo imagen..." : "Subir imagen"}
-                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={loading || !!loadError || uploadingImage !== ""} onChange={(event) => void handleUpload(field.key, event)} />
-                </label>
-                {isSafeImageSource(source) && <img src={source} alt={`Vista previa: ${field.label}`} className="h-36 w-full rounded-xl bg-muted object-cover" />}
+        <div className="space-y-4" aria-label={`Imágenes de ${section}`}>
+          {groupFields(imageFields).map(([groupLabel, fields]) => (
+            <section key={groupLabel} className="rounded-media border border-border bg-card p-5 shadow-soft">
+              <h3 className="mb-3 text-xs font-bold tracking-wide text-accent uppercase">{groupLabel}</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                {fields.map((field) => {
+                  const source = draft.images[field.key];
+                  return (
+                    <div key={field.key} className="space-y-3 rounded-xl border border-border p-4">
+                      <label className="grid gap-1.5 text-sm font-bold text-foreground">
+                        <span className="flex items-center gap-2"><ImageSquare weight="duotone" className="size-5 text-accent" />{field.label}</span>
+                        <input
+                          type="url"
+                          value={source}
+                          disabled={loading || !!loadError}
+                          onChange={(event) => updateImage(field.key, event.target.value)}
+                          placeholder="https://..."
+                          className="h-11 w-full rounded-xl border border-border bg-background px-3 font-normal focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                        />
+                      </label>
+                      <label className="inline-flex cursor-pointer items-center rounded-full border border-border px-4 py-2 text-sm font-bold hover:border-accent">
+                        {uploadingImage === field.key ? "Subiendo imagen..." : "Subir imagen"}
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={loading || !!loadError || uploadingImage !== ""} onChange={(event) => void handleUpload(field.key, event)} />
+                      </label>
+                      {isSafeImageSource(source) && <img src={source} alt={`Vista previa: ${field.label}`} className="h-36 w-full rounded-xl bg-muted object-cover" />}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </section>
+            </section>
+          ))}
+        </div>
       )}
 
       {section === "Tienda" && (

@@ -67,8 +67,8 @@ type AdminView = "dashboard" | "leads" | "purchases" | "contacts" | "accounts" |
 
 const adminViews: Record<AdminView, { label: string; description: string; icon: typeof Gauge; roles: StaffRole[] }> = {
   dashboard: { label: "Dashboard", description: "Resumen de solicitudes, contactos y mensajes guardados en Neon.", icon: Gauge, roles: ["admin", "sales"] },
-  leads: { label: "Pedidos y solicitudes", description: "Pedidos de la tienda y solicitudes de cita capturadas en la web.", icon: ClipboardText, roles: ["admin", "sales"] },
-  purchases: { label: "Compras por cliente", description: "Registra ventas confirmadas y consulta el historial de compras por cliente.", icon: Receipt, roles: ["admin", "sales"] },
+  leads: { label: "Pedidos y solicitudes", description: "Pedidos hechos desde la tienda online y solicitudes de cita capturadas en la web.", icon: ClipboardText, roles: ["admin", "sales"] },
+  purchases: { label: "Compras por cliente", description: "Para ventas que NO pasaron por la tienda online (en el local, por teléfono o WhatsApp): regístralas aquí para que queden en el historial del cliente.", icon: Receipt, roles: ["admin", "sales"] },
   contacts: { label: "Clientes y contactos", description: "Contactos del CRM, etapa del ciclo de vida y consentimiento.", icon: Users, roles: ["admin", "sales"] },
   messages: { label: "Mensajes", description: "Mensajes recibidos desde formularios y WhatsApp.", icon: ChatCircleDots, roles: ["admin", "sales"] },
   marketing: { label: "Email marketing", description: "Campañas por segmento con consentimiento verificado.", icon: EnvelopeSimple, roles: ["admin", "sales"] },
