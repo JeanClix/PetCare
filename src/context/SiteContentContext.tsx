@@ -39,8 +39,23 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
   }, [loadVersion]);
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--color-primary", content.colors.primary);
-    document.documentElement.style.setProperty("--color-accent", content.colors.accent);
+    const root = document.documentElement;
+    const applyBrandColors = () => {
+      // Un color inline pisa cualquier regla CSS, incluida la paleta de .dark:
+      // si lo dejáramos fijo, el modo oscuro se quedaría con textos oscuros
+      // sobre fondo oscuro. En oscuro dejamos que la hoja de estilos mande.
+      if (root.classList.contains("dark")) {
+        root.style.removeProperty("--color-primary");
+        root.style.removeProperty("--color-accent");
+      } else {
+        root.style.setProperty("--color-primary", content.colors.primary);
+        root.style.setProperty("--color-accent", content.colors.accent);
+      }
+    };
+    applyBrandColors();
+    const observer = new MutationObserver(applyBrandColors);
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
   }, [content.colors]);
 
   const publish = useCallback(async (token: string, value: SiteContent) => {
