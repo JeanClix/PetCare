@@ -1435,6 +1435,7 @@ export default {
     try {
       await ensureSchema(sql);
       if (action === "appointment-slots") {
+        const veterinarianId = activeSession.role === "veterinarian" ? activeSession.id : null;
         const slots = await sql`
           SELECT s.id, s.starts_at AS "startsAt", s.ends_at AS "endsAt", s.status,
             s.veterinarian_id AS "veterinarianId",
@@ -1445,7 +1446,7 @@ export default {
           WHERE s.starts_at >= now()
             AND s.starts_at < now() + interval '90 days'
             AND s.status <> 'cancelled'
-            AND (${activeSession.role !== "veterinarian"} OR s.veterinarian_id IS NULL OR s.veterinarian_id = ${activeSession.id}::uuid)
+            AND (${veterinarianId}::uuid IS NULL OR s.veterinarian_id IS NULL OR s.veterinarian_id = ${veterinarianId}::uuid)
             AND (${activeSession.role !== "customer"} OR s.status = 'available')
           ORDER BY s.starts_at
           LIMIT 300
@@ -1642,10 +1643,11 @@ export default {
         }
         const slotId = text(body?.id, 36);
         if (!UUID_PATTERN.test(slotId)) return response({ error: "Horario inválido." }, 400, origin);
+        const veterinarianId = activeSession.role === "veterinarian" ? activeSession.id : null;
         const cancelled = await sql`
           UPDATE petcare_appointment_slots SET status = 'cancelled'
           WHERE id = ${slotId}::uuid AND status = 'available' AND starts_at > now()
-            AND (${activeSession.role === "admin"} OR veterinarian_id = ${activeSession.id}::uuid)
+            AND (${veterinarianId}::uuid IS NULL OR veterinarian_id = ${veterinarianId}::uuid)
           RETURNING id
         `;
         if (!cancelled.length) return response({ error: "Solo se pueden quitar horarios disponibles y futuros." }, 409, origin);
