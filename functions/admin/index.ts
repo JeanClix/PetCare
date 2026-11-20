@@ -38,7 +38,7 @@ const SOCIAL_ADMIN_ACTIONS = [
 ];
 const SITE_ADMIN_ACTIONS = ["site-content", "site-image-upload"];
 const SITE_CONTENT_KEY = /^[a-zA-Z0-9._-]{1,100}$/;
-const SITE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const SITE_IMAGE_TYPES = new Set(["image/jpeg", "image/png"]);
 
 // Métodos de pago simulados: no se procesa dinero real, solo se registra la preferencia del cliente
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -475,6 +475,37 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
   await sql`ALTER TABLE petcare_leads ADD COLUMN IF NOT EXISTS appointment_price NUMERIC(10, 2)`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS petcare_leads_appointment_slot_idx ON petcare_leads (appointment_slot_id) WHERE appointment_slot_id IS NOT NULL`;
   await sql`CREATE INDEX IF NOT EXISTS petcare_appointment_slots_status_start_idx ON petcare_appointment_slots (status, starts_at)`;
+  await sql`
+    UPDATE petcare_appointment_slots s
+    SET veterinarian_id = v.id
+    FROM (
+      SELECT id FROM petcare_users WHERE role = 'veterinarian' ORDER BY created_at LIMIT 1
+    ) v
+    WHERE s.veterinarian_id IS NULL AND s.status <> 'cancelled'
+  `;
+  await sql`
+    WITH default_vet AS (
+      SELECT id FROM petcare_users WHERE role = 'veterinarian' ORDER BY created_at LIMIT 1
+    )
+    INSERT INTO petcare_appointment_slots (
+      id, veterinarian_id, starts_at, ends_at, service, status, created_by_id
+    )
+    SELECT md5(random()::text || clock_timestamp()::text)::uuid,
+      default_vet.id,
+      date_trunc('day', now()) + interval '1 day' + make_interval(hours => candidate.hour),
+      date_trunc('day', now()) + interval '1 day' + make_interval(hours => candidate.hour, mins => 30),
+      candidate.service,
+      'available',
+      default_vet.id
+    FROM default_vet
+    CROSS JOIN (
+      VALUES ('Consultas', 9), ('Vacunación', 11), ('Desparasitación', 15)
+    ) AS candidate(service, hour)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM petcare_appointment_slots
+      WHERE status = 'available' AND starts_at > now()
+    )
+  `;
   await sql`
     CREATE TABLE IF NOT EXISTS petcare_marketing_campaigns (
       id UUID PRIMARY KEY,
@@ -1484,7 +1515,7 @@ export default {
       }
       if (action === "my-orders") {
         if (activeSession.role !== "customer") return response({ error: "Solo los clientes pueden ver sus pedidos." }, 403, origin);
-        const orders = await sql`
+        const onlineOrders = await sql`
           SELECT l.id, l.status, l.total, l.details AS message, l.created_at AS "createdAt"
           FROM petcare_leads l
           JOIN petcare_contacts c ON c.id = l.contact_id AND c.account_id = ${activeSession.id}::uuid
@@ -1492,12 +1523,35 @@ export default {
           ORDER BY l.created_at DESC
           LIMIT 100
         `;
+        const recordedPurchases = await sql`
+          SELECT p.id,
+            'closed'::text AS status,
+            p.total,
+            ('Compra confirmada' ||
+              coalesce((
+                SELECT chr(10) || string_agg(
+                  (item.value->>'quantity') || ' x ' || (item.value->>'name'),
+                  chr(10)
+                )
+                FROM jsonb_array_elements(p.items) AS item(value)
+              ), '')
+            ) AS message,
+            p.created_at AS "createdAt"
+          FROM petcare_purchases p
+          JOIN petcare_contacts c ON c.id = p.contact_id
+          WHERE c.account_id = ${activeSession.id}::uuid
+          ORDER BY p.created_at DESC
+          LIMIT 100
+        `;
+        const orders = [...onlineOrders, ...recordedPurchases].sort((a, b) =>
+          new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime()
+        ).slice(0, 100);
         return response({ orders }, 200, origin);
       }
       if (action === "site-image-upload") {
         const mimeType = request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() ?? "";
         if (!SITE_IMAGE_TYPES.has(mimeType)) {
-          return response({ error: "Usa una imagen JPG, PNG o WebP." }, 415, origin);
+          return response({ error: "Usa una imagen JPG o PNG." }, 415, origin);
         }
         const image = await readBoundedBody(request, 5 * 1024 * 1024);
         if (!image?.byteLength) return response({ error: "La imagen debe pesar 5 MB o menos." }, 413, origin);
@@ -1621,7 +1675,16 @@ export default {
         ) {
           return response({ error: "El horario debe durar entre 15 minutos y 4 horas, dentro de los próximos 90 días." }, 400, origin);
         }
-        const veterinarianId = activeSession.role === "veterinarian" ? activeSession.id : text(body?.veterinarianId, 36);
+        let veterinarianId = activeSession.role === "veterinarian" ? activeSession.id : text(body?.veterinarianId, 36);
+        if (activeSession.role === "admin" && !veterinarianId) {
+          const defaultVeterinarian = await sql`
+            SELECT id FROM petcare_users
+            WHERE role = 'veterinarian'
+            ORDER BY created_at
+            LIMIT 1
+          `;
+          veterinarianId = defaultVeterinarian.length ? String(defaultVeterinarian[0].id) : "";
+        }
         if (veterinarianId && !UUID_PATTERN.test(veterinarianId)) return response({ error: "Elige un veterinario válido." }, 400, origin);
         if (veterinarianId) {
           const veterinarian = await sql`
