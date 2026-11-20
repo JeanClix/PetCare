@@ -69,8 +69,8 @@ export function SiteEditor({ token }: { token: string }) {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Usa una imagen JPG, PNG o WebP.");
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setError("Usa una imagen JPG o PNG.");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -93,8 +93,8 @@ export function SiteEditor({ token }: { token: string }) {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Usa una imagen JPG, PNG o WebP.");
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setError("Usa una imagen JPG o PNG.");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -223,7 +223,7 @@ export function SiteEditor({ token }: { token: string }) {
                 </label>
                 <label className="inline-flex cursor-pointer items-center rounded-full border border-border px-4 py-2 text-sm font-bold hover:border-accent">
                   {uploadingImage === field.key ? "Subiendo imagen..." : "Subir imagen"}
-                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={loading || !!loadError || uploadingImage !== ""} onChange={(event) => void handleUpload(field.key, event)} />
+                  <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" className="sr-only" disabled={loading || !!loadError || uploadingImage !== ""} onChange={(event) => void handleUpload(field.key, event)} />
                 </label>
                 {isSafeImageSource(source) && <img src={source} alt={`Vista previa: ${field.label}`} className="h-36 w-full rounded-xl bg-muted object-cover" />}
               </div>
@@ -294,7 +294,7 @@ function ProductEditorCard({
         <img src={isSafeImageSource(product.image) ? product.image : undefined} alt="" className="aspect-square w-full rounded-xl bg-muted object-contain p-2" />
         <label className={cn("block rounded-full border border-border px-3 py-2 text-center text-xs font-bold hover:border-accent", (disabled || uploadingImage) ? "cursor-not-allowed opacity-50" : "cursor-pointer")}>
           {uploading ? "Subiendo..." : "Cambiar imagen"}
-          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={disabled || uploadingImage} onChange={onUpload} />
+          <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" className="sr-only" disabled={disabled || uploadingImage} onChange={onUpload} />
         </label>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

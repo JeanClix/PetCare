@@ -45,7 +45,11 @@ export function AvailabilityManager({ token, role }: { token: string; role: Staf
       setSlots(nextSlots);
       const availableVeterinarians = accounts.filter((account) => account.role === "veterinarian");
       setVeterinarians(availableVeterinarians);
-      setVeterinarianId((current) => availableVeterinarians.some((account) => account.id === current) ? current : "");
+      setVeterinarianId((current) =>
+        availableVeterinarians.some((account) => account.id === current)
+          ? current
+          : availableVeterinarians[0]?.id ?? "",
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo cargar la disponibilidad.");
     } finally {
@@ -70,6 +74,10 @@ export function AvailabilityManager({ token, role }: { token: string; role: Staf
       setError("Selecciona el servicio para este horario.");
       return;
     }
+    if (role === "admin" && !veterinarianId) {
+      setError("Selecciona un veterinario para publicar el horario.");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -78,7 +86,7 @@ export function AvailabilityManager({ token, role }: { token: string; role: Staf
         startsAt: start.toISOString(),
         endsAt: end.toISOString(),
         service: service.name,
-        ...(role === "admin" && veterinarianId ? { veterinarianId } : {}),
+        ...(role === "admin" ? { veterinarianId } : {}),
       });
       setStartsAt("");
       setEndsAt("");
@@ -161,7 +169,7 @@ export function AvailabilityManager({ token, role }: { token: string; role: Staf
               }}
               className={inputClass}
             >
-              <option value="">Sin asignar</option>
+              <option value="" disabled>Selecciona un veterinario</option>
               {veterinarians.map((vet) => (
                 <option key={vet.id} value={vet.id}>{`${vet.firstname} ${vet.lastname}`.trim() || vet.email}</option>
               ))}
