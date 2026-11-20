@@ -78,7 +78,7 @@ La función `admin` agrega automáticamente la columna de servicio y permite que
 
 ## Registro de compras confirmadas
 
-La seccion **Ventas -> Compras por cliente** permite a administradores y ventas registrar una compra despues de confirmar la venta. Cada registro queda asociado a un contacto, conserva productos, cantidades, precio unitario, total, fecha y quien lo registro; el historial se agrupa por cliente. Los precios se pueden ajustar al registrar para guardar el importe realmente cobrado.
+El módulo de **Compras por cliente** permite registrar una compra despues de confirmar la venta. Cada registro queda asociado a un contacto, conserva productos, cantidades, precio unitario, total, fecha y quien lo registro; el historial se agrupa por cliente. Los precios se pueden ajustar al registrar para guardar el importe realmente cobrado.
 
 Este registro es independiente de los pedidos iniciados desde la tienda: esos pedidos siguen siendo solicitudes coordinadas por WhatsApp y no cuentan como ventas confirmadas. La tabla `petcare_purchases` se crea de forma idempotente al atender una solicitud de la funcion `admin`; no requiere ejecutar una migracion manual. La creacion se limita a los roles `admin` y `sales`, y el borrado general del CRM tambien elimina los historiales de compra asociados.
 
