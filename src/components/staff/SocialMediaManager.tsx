@@ -70,7 +70,7 @@ export function SocialMediaManager({ token, oauthState }: { token: string; oauth
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
     if (params.get("social") === "connected") {
-      setNotice("Autorización completada. Elige la página de Facebook de Gabus Vet para terminar de conectar las cuentas.");
+      setNotice("Autorización completada. Elige la página de Facebook de PetCare para terminar de conectar las cuentas.");
     } else if (params.get("social") === "error") {
       setError("Meta no pudo completar la conexión. Verifica los permisos y vuelve a intentarlo.");
     }
@@ -186,7 +186,7 @@ export function SocialMediaManager({ token, oauthState }: { token: string; oauth
             <ShareNetwork weight="fill" className="size-6" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-lg font-black text-primary">Cuentas de Gabus Vet</h2>
+            <h2 className="font-display text-lg font-black text-primary">Cuentas de PetCare</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Conecta la página de Facebook y su cuenta profesional de Instagram vinculada. PetCare usará la API oficial de Meta.
             </p>
@@ -318,7 +318,7 @@ export function SocialMediaManager({ token, oauthState }: { token: string; oauth
                 {selectedPlatforms.map((platform) => platform === "facebook"
                   ? <FacebookLogo key={platform} weight="fill" className="size-5 text-[#1877F2]" />
                   : <InstagramLogo key={platform} weight="fill" className="size-5 text-[#C13584]" />)}
-                <span>Gabus Vet</span>
+                <span>PetCare</span>
               </div>
               {imagePreview
                 ? <img src={imagePreview} alt="Vista previa de la publicación" className="aspect-square w-full object-cover" />

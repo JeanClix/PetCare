@@ -43,7 +43,7 @@ El equipo escribe a los clientes desde el panel con el WhatsApp de la clínica (
 
 ### Redes sociales
 
-El administrador conecta la página de Facebook de Gabus Vet y su cuenta profesional de Instagram vinculada desde **Marketing → Redes Sociales**. Puede redactar publicaciones, adjuntar una imagen JPEG, previsualizar y publicar mediante la API oficial de Meta; los intentos y resultados quedan en Neon. Requiere una app de Meta configurada en la función admin. Guía: **[docs/redes-sociales.md](docs/redes-sociales.md)**.
+El administrador conecta la página de Facebook de PetCare y su cuenta profesional de Instagram vinculada desde **Marketing → Redes Sociales**. Puede redactar publicaciones, adjuntar una imagen JPEG, previsualizar y publicar mediante la API oficial de Meta; los intentos y resultados quedan en Neon. Requiere una app de Meta configurada en la función admin. Guía: **[docs/redes-sociales.md](docs/redes-sociales.md)**.
 
 ### Roles y panel interno
 
