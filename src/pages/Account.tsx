@@ -9,10 +9,12 @@ import { useCart } from "@/context/CartContext";
 import { isDevelopmentAdminAuth, isStaffRole } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
 import { CustomerAppointments } from "@/pages/clinic/CustomerAppointments";
+import { useSiteContent } from "@/context/SiteContentContext";
 
 type Mode = "login" | "register";
 
 export function Account() {
+  const { text } = useSiteContent();
   const { user, ready, login, register, logout } = useAuth();
   const { open: openCart } = useCart();
   const navigate = useNavigate();
@@ -68,7 +70,7 @@ export function Account() {
   if (user?.role === "customer") {
     return (
       <>
-        <PageHeader title="Mi cuenta" description="Tu sesión de cliente está activa." />
+        <PageHeader title={text("account.page.title")} description={text("account.page.description")} />
         <Container className="py-10 sm:py-14">
           <div className="mx-auto max-w-3xl space-y-5">
           <section className="space-y-5 rounded-media border border-border bg-card p-6 shadow-soft sm:p-8">
@@ -100,12 +102,12 @@ export function Account() {
       <section className="mx-auto max-w-md space-y-5 rounded-media border border-border bg-card p-6 shadow-soft sm:p-8">
         <div>
           <h1 className="text-2xl font-black text-primary sm:text-3xl">
-            {mode === "login" ? "Inicia sesión" : "Crea tu cuenta"}
+            {text(mode === "login" ? "account.login.title" : "account.register.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {next === "/citas"
-              ? "Inicia sesión o crea tu cuenta para reservar y seguir tu cita."
-              : mode === "login" ? "Entra para hacer pedidos y ver tu cuenta." : "Regístrate para hacer pedidos en la tienda."}
+              ? text("account.login.appointmentDescription")
+              : text(mode === "login" ? "account.login.description" : "account.register.description")}
           </p>
         </div>
         <div className="flex rounded-full bg-muted p-1" role="tablist" aria-label="Acceso a PetCare">
@@ -122,7 +124,7 @@ export function Account() {
                 mode === option ? "bg-card text-primary shadow-soft" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {option === "login" ? "Iniciar sesión" : "Registrarme"}
+              {text(option === "login" ? "account.login.tab" : "account.register.tab")}
             </button>
           ))}
         </div>
@@ -152,7 +154,7 @@ export function Account() {
           )}
           <div className="space-y-2">
             <label htmlFor="account-email" className="block text-sm font-bold">
-              {isDevelopmentAdminAuth ? "Usuario" : "Correo electrónico"}
+              {text(isDevelopmentAdminAuth ? "account.username.label" : "account.email.label")}
             </label>
             <input
               id="account-email"
@@ -167,7 +169,7 @@ export function Account() {
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="account-password" className="block text-sm font-bold">Contraseña</label>
+            <label htmlFor="account-password" className="block text-sm font-bold">{text("account.password.label")}</label>
             <input
               id="account-password"
               name="password"

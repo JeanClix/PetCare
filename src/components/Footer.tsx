@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { Container } from "@/components/ui/Container";
 import { business } from "@/data/site";
+import { useSiteContent } from "@/context/SiteContentContext";
+import { sitePhoneHref } from "@/lib/siteContent";
 
 type Theme = "light" | "dark";
 
@@ -24,15 +26,15 @@ function readTheme(): Theme {
   }
 }
 
-const links = [
-  { to: "/tienda", label: "Tienda" },
-  { to: "/servicios", label: "Servicios" },
-  { to: "/nosotros", label: "Nosotros" },
-  { to: "/contacto", label: "Contacto" },
-];
-
 export function Footer() {
+  const { text } = useSiteContent();
   const [theme, setTheme] = useState<Theme>(readTheme);
+  const links = [
+    { to: "/tienda", label: text("global.nav.shop") },
+    { to: "/servicios", label: text("global.nav.services") },
+    { to: "/nosotros", label: text("global.nav.about") },
+    { to: "/contacto", label: text("global.nav.contact") },
+  ];
 
   return (
     <footer className="bg-brand-navy-deep text-white/75">
@@ -42,11 +44,11 @@ export function Footer() {
           <address className="max-w-sm text-[0.95rem] leading-relaxed not-italic">
             {business.address}
             <br />
-            {business.hours}
+            {text("global.hours")}
             <br />
-            <a href={business.phoneHref} className="hover:text-white">{business.phone}</a>
+            <a href={sitePhoneHref(text("global.phone"))} className="hover:text-white">{text("global.phone")}</a>
             {", emergencias "}
-            <a href={business.emergencyHref} className="font-bold text-[#6fe0c4] hover:text-white">{business.emergency}</a>
+            <a href={sitePhoneHref(text("global.emergency"))} className="font-bold text-[#6fe0c4] hover:text-white">{text("global.emergency")}</a>
           </address>
         </div>
 
