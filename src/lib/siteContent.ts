@@ -1,4 +1,5 @@
 import { adminRequest, getPublicSiteContent } from "@/lib/adminAuth";
+import { asset } from "@/lib/asset";
 import { products as catalogProducts, type Product } from "@/data/products";
 import { brands as brandCatalog, services as serviceCatalog, testimonials as testimonialCatalog, type Service } from "@/data/site";
 
@@ -118,7 +119,7 @@ export const defaultSiteContent: SiteContent = {
     "home.hero.guineaPigs": "https://images.unsplash.com/photo-1548767797-d8c844163c4c?auto=format&fit=crop&w=700&q=75",
     "home.services.consultation": "https://images.unsplash.com/photo-1628009368231-7bb7cfcb0def?auto=format&fit=crop&w=1000&q=75",
     "home.services.bath": "https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&w=1000&q=75",
-    "home.travel.image": "/img/services/pet-travel-pexels.jpg",
+    "home.travel.image": asset("/img/services/pet-travel-pexels.jpg"),
     "home.testimonials.image": "https://images.unsplash.com/photo-1587300003388-59208cc962cb?auto=format&fit=crop&w=1000&q=75",
     "about.image": "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=1000&q=75",
     "contact.image": "https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?auto=format&fit=crop&w=800&q=75",

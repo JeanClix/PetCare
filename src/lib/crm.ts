@@ -437,6 +437,23 @@ export async function getMyAppointments(token: string): Promise<CustomerAppointm
   }));
 }
 
+export type CustomerOrder = {
+  id: string;
+  status: CrmLeadStatus;
+  total: number | null;
+  message: string;
+  createdAt: string;
+};
+
+export async function getMyOrders(token: string): Promise<CustomerOrder[]> {
+  const result = await adminRequest<{ orders: Array<Omit<CustomerOrder, "total"> & { total?: number | string | null }> }>("/my-orders", {}, token);
+  return result.orders.map((order) => ({
+    ...order,
+    createdAt: new Date(order.createdAt).toISOString(),
+    total: order.total === null || order.total === undefined ? null : Number(order.total),
+  }));
+}
+
 export async function setAppointmentStatus(token: string, id: string, status: CrmLeadStatus, price?: number) {
   await adminRequest("/crm/appointment-status", { id, status, price }, token);
 }

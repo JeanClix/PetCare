@@ -9,6 +9,7 @@ import { useCart } from "@/context/CartContext";
 import { isDevelopmentAdminAuth, isStaffRole } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
 import { CustomerAppointments } from "@/pages/clinic/CustomerAppointments";
+import { CustomerOrders } from "@/pages/CustomerOrders";
 import { useSiteContent } from "@/context/SiteContentContext";
 
 type Mode = "login" | "register";
@@ -91,6 +92,7 @@ export function Account() {
             </div>
           </section>
           <CustomerAppointments token={user.token} />
+          <CustomerOrders token={user.token} />
           </div>
         </Container>
       </>

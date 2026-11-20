@@ -1,25 +1,73 @@
 import {
   ArrowLeft,
+  Bank,
   CheckCircle,
   CircleNotch,
+  CreditCard,
   Handbag,
   Minus,
   Plus,
+  QrCode,
   Storefront,
   Trash,
-  WhatsappLogo,
   X,
 } from "@phosphor-icons/react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Button, ButtonAnchor, ButtonLink } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConsentFields, Field, inputClass, validateContact, type ContactErrors } from "@/components/ui/Form";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { createCustomerOrder } from "@/lib/adminAuth";
-import { formatPrice, whatsappLink } from "@/lib/utils";
+import { createCustomerOrder, type PaymentMethod } from "@/lib/adminAuth";
+import { payments } from "@/data/site";
+import { cn } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 
 type Step = "cart" | "checkout" | "sending" | "done";
+
+const paymentMethods: { value: PaymentMethod; label: string; icon: ReactNode; detail: ReactNode }[] = [
+  {
+    value: "yape",
+    label: "Yape",
+    icon: <QrCode weight="duotone" />,
+    detail: (
+      <>
+        Yapea a <strong>{payments.yapePlinNumber}</strong> a nombre de {payments.yapePlinHolder}. Envía la captura por
+        WhatsApp si quieres confirmación inmediata.
+      </>
+    ),
+  },
+  {
+    value: "plin",
+    label: "Plin",
+    icon: <QrCode weight="duotone" />,
+    detail: (
+      <>
+        Plinea a <strong>{payments.yapePlinNumber}</strong> a nombre de {payments.yapePlinHolder}.
+      </>
+    ),
+  },
+  {
+    value: "transferencia",
+    label: "Transferencia bancaria",
+    icon: <Bank weight="duotone" />,
+    detail: (
+      <>
+        {payments.bank.bankName} · {payments.bank.accountType}
+        <br />
+        Cuenta: <strong>{payments.bank.accountNumber}</strong> · CCI: {payments.bank.cci}
+        <br />
+        Titular: {payments.bank.holder}
+      </>
+    ),
+  },
+  {
+    value: "tarjeta",
+    label: "Tarjeta",
+    icon: <CreditCard weight="duotone" />,
+    detail: <>Nuestro equipo de ventas te enviará un enlace de cobro seguro para pagar con tarjeta.</>,
+  },
+];
 
 export function CartDrawer() {
   const { lines, total, count, isOpen, close, setQty, remove, clear } = useCart();
@@ -29,7 +77,8 @@ export function CartDrawer() {
   const [step, setStep] = useState<Step>("cart");
   const [errors, setErrors] = useState<ContactErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [orderWhatsapp, setOrderWhatsapp] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("yape");
+  const [confirmedPayment, setConfirmedPayment] = useState<PaymentMethod>("yape");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -67,7 +116,6 @@ export function CartDrawer() {
   if (!isOpen) return null;
 
   const orderLines = lines.map((l) => `${l.qty} x ${l.product.name} (${formatPrice(l.product.price * l.qty)})`);
-  const orderMessage = ["Hola PetCare, quiero hacer este pedido:", ...orderLines.map((l) => `- ${l}`), `Total referencial: ${formatPrice(total)}`].join("\n");
 
   async function handleCheckout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -87,7 +135,6 @@ export function CartDrawer() {
     }
 
     const get = (k: string) => String(data.get(k) ?? "").trim();
-    const owner = `${user.firstname} ${user.lastname}`.trim();
 
     setStep("sending");
     setSubmitError(null);
@@ -96,6 +143,7 @@ export function CartDrawer() {
         phone: get("phone"),
         total,
         items: orderLines,
+        paymentMethod,
         consent: true,
         marketingConsent: data.get("marketing") === "on",
       });
@@ -105,10 +153,7 @@ export function CartDrawer() {
       return;
     }
 
-    // Safari puede bloquear esta ventana por abrirse tras la espera; el panel final repite el enlace
-    const link = whatsappLink(`${orderMessage}\nA nombre de: ${owner}`);
-    window.open(link, "_blank", "noopener");
-    setOrderWhatsapp(link);
+    setConfirmedPayment(paymentMethod);
     clear();
     setStep("done");
   }
@@ -134,17 +179,29 @@ export function CartDrawer() {
         </div>
 
         {step === "done" ? (
-          <div role="status" className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-            <CheckCircle weight="fill" className="size-14 text-accent" />
+          <div role="status" className="flex flex-1 flex-col items-center gap-5 overflow-y-auto p-8 text-center">
+            <CheckCircle weight="fill" className="size-14 shrink-0 text-accent" />
             <div>
               <p className="font-display text-xl font-black">Registramos tu pedido</p>
               <p className="mt-1.5 text-sm text-muted-foreground">
-                Coordinemos el pago y el recojo o la entrega por WhatsApp. Si no se abrió, usa este botón.
+                Nuestro equipo de ventas revisará tu pago y coordinará el recojo o la entrega.
               </p>
             </div>
-            <ButtonAnchor href={orderWhatsapp} variant="whatsapp">
-              <WhatsappLogo weight="fill" /> Abrir WhatsApp
-            </ButtonAnchor>
+            {(() => {
+              const method = paymentMethods.find((m) => m.value === confirmedPayment);
+              return method ? (
+                <div className="w-full space-y-2 rounded-xl border border-border bg-muted/50 p-4 text-left text-sm">
+                  <p className="flex items-center gap-2 font-bold text-primary">
+                    <span className="[&_svg]:size-5 [&_svg]:text-accent">{method.icon}</span>
+                    Paga con {method.label}
+                  </p>
+                  <p className="text-muted-foreground">{method.detail}</p>
+                </div>
+              ) : null;
+            })()}
+            <ButtonLink to="/cuenta" onClick={close}>
+              Ver mis pedidos
+            </ButtonLink>
             <Button variant="ghost" size="sm" onClick={close}>
               Seguir navegando
             </Button>
@@ -217,9 +274,6 @@ export function CartDrawer() {
         ) : (
           <form noValidate onSubmit={handleCheckout} className="flex flex-1 flex-col overflow-hidden">
             <div className="flex-1 space-y-6 overflow-y-auto p-5">
-              <p className="text-sm text-muted-foreground">
-                Registramos tu pedido y te llevamos a WhatsApp para coordinar el pago y el recojo o la entrega.
-              </p>
               <div className="rounded-xl border border-border bg-background p-4 text-sm">
                 <p className="font-bold">{`${user?.firstname ?? ""} ${user?.lastname ?? ""}`.trim()}</p>
                 <p className="text-muted-foreground">{user?.email}</p>
@@ -242,17 +296,41 @@ export function CartDrawer() {
                   className={inputClass}
                 />
               </Field>
+
+              <div className="space-y-2.5">
+                <p className="block text-sm font-bold">Método de pago</p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {paymentMethods.map((method) => {
+                    const active = method.value === paymentMethod;
+                    return (
+                      <button
+                        key={method.value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setPaymentMethod(method.value)}
+                        className={cn(
+                          "flex items-center gap-2 rounded-xl border-2 bg-background px-3 py-2.5 text-left text-sm font-bold transition-colors",
+                          active ? "border-accent ring-2 ring-accent/20" : "border-border hover:border-accent/60",
+                        )}
+                      >
+                        <span className="[&_svg]:size-5 [&_svg]:text-accent">{method.icon}</span>
+                        {method.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="rounded-xl bg-muted/50 p-3 text-sm text-muted-foreground">
+                  {paymentMethods.find((m) => m.value === paymentMethod)?.detail}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Al confirmar tu pedido, nuestro equipo verificará el pago y coordinará el recojo o la entrega.
+                </p>
+              </div>
+
               <ConsentFields error={errors.consent} />
               {submitError && (
                 <div role="alert" className="rounded-xl border-2 border-danger/30 px-4 py-3 text-sm">
                   <p className="font-bold text-danger">{submitError}</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Inténtalo de nuevo o{" "}
-                    <a href={whatsappLink(orderMessage)} target="_blank" rel="noopener noreferrer" className="font-bold text-accent underline underline-offset-2">
-                      envía el pedido por WhatsApp
-                    </a>
-                    .
-                  </p>
                 </div>
               )}
             </div>
@@ -261,15 +339,13 @@ export function CartDrawer() {
                 <span className="text-muted-foreground">Total</span>
                 <span className="font-display text-2xl font-black tabular-nums">{formatPrice(total)}</span>
               </div>
-              <Button type="submit" variant="whatsapp" size="lg" className="w-full" disabled={step === "sending"}>
+              <Button type="submit" size="lg" className="w-full" disabled={step === "sending"}>
                 {step === "sending" ? (
                   <>
                     <CircleNotch weight="bold" className="animate-spin" /> Registrando
                   </>
                 ) : (
-                  <>
-                    <WhatsappLogo weight="fill" /> Finalizar pedido
-                  </>
+                  "Confirmar pedido"
                 )}
               </Button>
             </div>

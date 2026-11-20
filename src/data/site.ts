@@ -24,6 +24,19 @@ export const business = {
 
 export const yearsOfExperience = new Date().getFullYear() - business.foundedYear;
 
+/** Datos de pago simulados para el checkout de la tienda (demo: no procesa dinero real) */
+export const payments = {
+  yapePlinNumber: business.emergency,
+  yapePlinHolder: business.legalName,
+  bank: {
+    bankName: "BCP",
+    accountType: "Cuenta corriente soles",
+    accountNumber: "193-2547896-0-11",
+    cci: "00219300254789601158",
+    holder: `${business.legalName} · RUC ${business.ruc}`,
+  },
+};
+
 export type ServiceIcon =
   | "stethoscope"
   | "bath"

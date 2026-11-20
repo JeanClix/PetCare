@@ -40,6 +40,14 @@ const SITE_ADMIN_ACTIONS = ["site-content", "site-image-upload"];
 const SITE_CONTENT_KEY = /^[a-zA-Z0-9._-]{1,100}$/;
 const SITE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+// Métodos de pago simulados: no se procesa dinero real, solo se registra la preferencia del cliente
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  yape: "Yape",
+  plin: "Plin",
+  transferencia: "Transferencia bancaria",
+  tarjeta: "Tarjeta (simulado)",
+};
+
 // Qué secciones del panel interno puede usar cada rol de staff
 const STAFF_PERMISSIONS: Record<Exclude<AccountRole, "customer">, ReadonlySet<string>> = {
   admin: new Set([
@@ -1398,6 +1406,9 @@ export default {
       const phone = text(body?.phone, 32).replace(/\D/g, "");
       const items = Array.isArray(body?.items) ? body.items.slice(0, 50).map((item) => text(item, 300)).filter(Boolean) : [];
       const total = typeof body?.total === "number" && Number.isFinite(body.total) ? body.total : Number.NaN;
+      const paymentMethodKey = text(body?.paymentMethod, 20);
+      const paymentMethodLabel = PAYMENT_METHOD_LABELS[paymentMethodKey];
+      if (!paymentMethodLabel) return response({ error: "Elige un método de pago válido." }, 400, origin);
       const input = validateCapture({
         firstname: activeSession.firstname,
         lastname: activeSession.lastname || activeSession.firstname,
@@ -1405,7 +1416,7 @@ export default {
         phone,
         source: "checkout",
         subject: "Pedido de tienda",
-        message: items.join("\n"),
+        message: [`Método de pago: ${paymentMethodLabel}`, ...items].join("\n"),
         channel: "form",
         marketingConsent: body?.marketingConsent === true,
         type: "order",
@@ -1417,9 +1428,9 @@ export default {
 
       try {
         await ensureSchema(sql);
-        await capture(sql, input, { accountId: activeSession.id });
+        const appointmentId = await capture(sql, input, { accountId: activeSession.id });
         await sql`UPDATE petcare_users SET phone = ${input.phone} WHERE id = ${activeSession.id}::uuid`;
-        return response({ ok: true }, 201, origin);
+        return response({ ok: true, orderId: appointmentId, paymentMethod: paymentMethodLabel }, 201, origin);
       } catch (error) {
         console.error("No se pudo guardar el pedido de cliente", error);
         return response({ error: "No pudimos registrar el pedido. Inténtalo nuevamente." }, 503, origin);
@@ -1428,7 +1439,7 @@ export default {
 
     const permissions = activeSession.role === "customer" ? null : STAFF_PERMISSIONS[activeSession.role];
     const customerAppointmentAction = activeSession.role === "customer" &&
-      ["appointment-slots", "my-appointments", "book-appointment"].includes(action);
+      ["appointment-slots", "my-appointments", "book-appointment", "my-orders"].includes(action);
     if (!customerAppointmentAction && !permissions?.has(action)) {
       return response({ error: "Tu rol no tiene acceso a esta sección." }, 403, origin);
     }
@@ -1470,6 +1481,18 @@ export default {
           LIMIT 100
         `;
         return response({ appointments }, 200, origin);
+      }
+      if (action === "my-orders") {
+        if (activeSession.role !== "customer") return response({ error: "Solo los clientes pueden ver sus pedidos." }, 403, origin);
+        const orders = await sql`
+          SELECT l.id, l.status, l.total, l.details AS message, l.created_at AS "createdAt"
+          FROM petcare_leads l
+          JOIN petcare_contacts c ON c.id = l.contact_id AND c.account_id = ${activeSession.id}::uuid
+          WHERE l.type = 'order'
+          ORDER BY l.created_at DESC
+          LIMIT 100
+        `;
+        return response({ orders }, 200, origin);
       }
       if (action === "site-image-upload") {
         const mimeType = request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() ?? "";

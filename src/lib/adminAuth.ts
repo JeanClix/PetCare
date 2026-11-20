@@ -121,11 +121,13 @@ export async function registerAccount(name: string, email: string, password: str
   return parseAccountSession(result, email);
 }
 
+export type PaymentMethod = "yape" | "plin" | "transferencia" | "tarjeta";
+
 export async function createCustomerOrder(
   token: string,
-  order: { phone: string; total: number; items: string[]; consent: true; marketingConsent: boolean },
+  order: { phone: string; total: number; items: string[]; paymentMethod: PaymentMethod; consent: true; marketingConsent: boolean },
 ) {
-  return adminRequest<{ ok: true }>("/account/order", order, token);
+  return adminRequest<{ ok: true; orderId: string; paymentMethod: string }>("/account/order", order, token);
 }
 
 export type ManagedAccount = {
