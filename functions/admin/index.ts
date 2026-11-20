@@ -806,7 +806,7 @@ async function capture(sql: NeonQueryFunction<false, false>, input: ContactInput
         id, external_id, contact_id, type, status, channel, service, pet, total, items, details, appointment_slot_id, created_at
       )
       SELECT ${leadId}, ${metadata.externalId ?? null}, id, ${input.type}, ${leadStatus}, ${input.channel}, ${input.service ?? null},
-        ${input.pet ?? null}, ${input.total ?? null}, ${JSON.stringify(input.items)}, ${input.message},
+        ${input.pet ?? null}, ${input.total ?? null}, ${JSON.stringify(input.items ?? [])}, ${input.message},
         ${metadata.appointmentSlotId ?? null}::uuid, ${now}
       FROM petcare_contacts WHERE email = ${input.email}
       ON CONFLICT DO NOTHING

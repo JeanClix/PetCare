@@ -46,6 +46,12 @@ export function AppointmentsBoard({
     return () => { active = false; };
   }, [token, reload]);
 
+  // Refresca la lista cada 20 s para que las citas nuevas (reservadas por clientes) aparezcan sin recargar la página.
+  useEffect(() => {
+    const interval = window.setInterval(() => setReload((value) => value + 1), 20000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const counts = useMemo(
     () => Object.fromEntries(columns.map(({ status }) => [status, appointments.filter((item) => item.status === status).length])) as Record<CrmLeadStatus, number>,
     [appointments],
