@@ -1,5 +1,7 @@
 import {
   CalendarCheck,
+  CaretLeft,
+  CaretRight,
   CheckCircle,
   CircleNotch,
   ClipboardText,
@@ -7,7 +9,7 @@ import {
   PaperPlaneTilt,
   ShieldCheck,
 } from "@phosphor-icons/react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -37,6 +39,113 @@ const petOptions: [Pet, string][] = [
   ["exotico", "Exótico (ave, reptil, roedor…)"],
 ];
 
+const WEEKDAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
+const MONTH_FORMATTER = new Intl.DateTimeFormat("es-PE", { month: "long", year: "numeric" });
+
+function dateKeyOf(iso: string) {
+  const date = new Date(iso);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function isSameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function isPastDay(date: Date) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+}
+
+/** Calendario mensual de 6 semanas (lunes a domingo) para elegir el día de la cita. */
+function AppointmentCalendar({
+  viewMonth,
+  onChangeMonth,
+  availableDates,
+  selectedDate,
+  onSelectDate,
+}: {
+  viewMonth: Date;
+  onChangeMonth: (next: Date) => void;
+  availableDates: Set<string>;
+  selectedDate: string | null;
+  onSelectDate: (dateKey: string) => void;
+}) {
+  const monthStart = startOfMonth(viewMonth);
+  const leadingBlanks = (monthStart.getDay() + 6) % 7;
+  const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const canGoBack = !isSameMonth(monthStart, today) && monthStart > today;
+  const cells: Array<{ date: Date; dateKey: string } | null> = [];
+  for (let i = 0; i < leadingBlanks; i += 1) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    cells.push({ date, dateKey });
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-background p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => onChangeMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1))}
+          disabled={!canGoBack}
+          aria-label="Mes anterior"
+          className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
+        >
+          <CaretLeft weight="bold" className="size-4" />
+        </button>
+        <p className="font-display text-sm font-black capitalize text-primary">{MONTH_FORMATTER.format(monthStart)}</p>
+        <button
+          type="button"
+          onClick={() => onChangeMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1))}
+          aria-label="Mes siguiente"
+          className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+        >
+          <CaretRight weight="bold" className="size-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted-foreground">
+        {WEEKDAY_LABELS.map((label, index) => <span key={`${label}-${index}`} className="py-1">{label}</span>)}
+      </div>
+      <div className="mt-1 grid grid-cols-7 gap-1">
+        {cells.map((cell, index) => {
+          if (!cell) return <span key={`blank-${index}`} />;
+          const hasSlots = availableDates.has(cell.dateKey);
+          const disabled = !hasSlots || isPastDay(cell.date);
+          const isSelected = selectedDate === cell.dateKey;
+          return (
+            <button
+              key={cell.dateKey}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelectDate(cell.dateKey)}
+              aria-pressed={isSelected}
+              className={cn(
+                "relative aspect-square rounded-lg text-sm font-bold transition-colors",
+                disabled && "cursor-not-allowed text-muted-foreground/40",
+                !disabled && !isSelected && "text-foreground hover:bg-accent-soft",
+                isSelected && "bg-accent text-accent-foreground shadow-soft",
+              )}
+            >
+              {cell.date.getDate()}
+              {hasSlots && !isSelected && !disabled && (
+                <span className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-accent" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function AppointmentBooking() {
   const { text, image } = useSiteContent();
   const [params] = useSearchParams();
@@ -51,9 +160,34 @@ export function AppointmentBooking() {
   const [slotError, setSlotError] = useState("");
   const [petName, setPetName] = useState("");
   const [petType, setPetType] = useState<Pet>("perro");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
   const selectedService = services.find((service) => service.id === selectedServiceId);
   const serviceSlots = selectedService ? slots.filter((slot) => slot.service === selectedService.name) : [];
   const selectedSlot = serviceSlots.find((slot) => slot.id === selectedSlotId);
+
+  const slotsByDate = useMemo(() => {
+    const map = new Map<string, AppointmentSlot[]>();
+    for (const slot of serviceSlots) {
+      const key = dateKeyOf(slot.startsAt);
+      map.set(key, [...(map.get(key) ?? []), slot]);
+    }
+    for (const list of map.values()) list.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    return map;
+  }, [serviceSlots]);
+  const availableDates = useMemo(() => new Set(slotsByDate.keys()), [slotsByDate]);
+  const daySlots = selectedDate ? (slotsByDate.get(selectedDate) ?? []) : [];
+
+  // Al cambiar de servicio o al cargar nuevos horarios, mostramos de entrada el primer día con cupos.
+  useEffect(() => {
+    const firstDateKey = [...availableDates].sort()[0] ?? null;
+    setSelectedDate((current) => (current && availableDates.has(current) ? current : firstDateKey));
+    if (firstDateKey) {
+      const [year, month] = firstDateKey.split("-").map(Number);
+      setViewMonth(new Date(year, month - 1, 1));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedServiceId, availableDates.size]);
 
   useEffect(() => {
     setSelectedServiceId(preselected);
@@ -222,25 +356,60 @@ export function AppointmentBooking() {
                   </Field>
                   <Field label="Horario disponible" name="appointment_slot">
                     {slotsLoading ? (
-                      <div className="h-12 animate-pulse rounded-xl bg-muted" />
+                      <div className="h-56 animate-pulse rounded-xl bg-muted" />
+                    ) : serviceSlots.length === 0 ? (
+                      <p className="rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">No hay horarios para este servicio todavía.</p>
                     ) : (
-                      <select
-                        id="appointment_slot"
-                        name="appointment_slot"
-                        required
-                        value={selectedSlotId}
-                        onChange={(event) => setSelectedSlotId(event.target.value)}
-                        className={inputClass}
-                        disabled={serviceSlots.length === 0}
-                      >
-                        <option value="" disabled>{serviceSlots.length ? "Selecciona un horario" : "No hay horarios para este servicio"}</option>
-                        {serviceSlots.map((slot) => (
-                          <option key={slot.id} value={slot.id}>
-                            {new Date(slot.startsAt).toLocaleString("es-PE", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · {slot.veterinarianName || "Personal por asignar"}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="space-y-4">
+                        <AppointmentCalendar
+                          viewMonth={viewMonth}
+                          onChangeMonth={setViewMonth}
+                          availableDates={availableDates}
+                          selectedDate={selectedDate}
+                          onSelectDate={(dateKey) => {
+                            setSelectedDate(dateKey);
+                            setSelectedSlotId((current) => {
+                              const stillValid = (slotsByDate.get(dateKey) ?? []).some((slot) => slot.id === current);
+                              return stillValid ? current : "";
+                            });
+                          }}
+                        />
+                        <div>
+                          <p className="mb-2 text-xs font-bold tracking-wide text-muted-foreground uppercase">
+                            {selectedDate
+                              ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" })
+                              : "Elige un día en el calendario"}
+                          </p>
+                          {daySlots.length === 0 ? (
+                            <p className="rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">Elige un día marcado con un punto para ver sus horarios.</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {daySlots.map((slot) => {
+                                const active = slot.id === selectedSlotId;
+                                return (
+                                  <button
+                                    key={slot.id}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() => setSelectedSlotId(slot.id)}
+                                    className={cn(
+                                      "flex flex-col items-start rounded-xl border-2 px-3.5 py-2 text-left transition-colors",
+                                      active ? "border-accent bg-accent-soft" : "border-border bg-background hover:border-accent/60",
+                                    )}
+                                  >
+                                    <span className="text-sm font-bold text-foreground">
+                                      {new Date(slot.startsAt).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">{slot.veterinarianName || "Personal por asignar"}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
+                    <input type="hidden" name="appointment_slot" value={selectedSlotId} />
                     {slotError && <p role="alert" className="text-sm font-semibold text-danger">{slotError}</p>}
                   </Field>
                 </div>
