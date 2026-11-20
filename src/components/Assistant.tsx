@@ -105,7 +105,7 @@ export function Assistant() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-5 left-4 z-40 flex h-13 items-center gap-2.5 rounded-full bg-primary pl-2 pr-5 font-display font-bold text-primary-foreground shadow-lift transition-transform hover:scale-[1.03] active:scale-[0.98] sm:left-6"
+          className="fixed bottom-5 left-4 z-40 flex h-13 cursor-pointer items-center gap-2.5 rounded-full bg-primary pl-2 pr-5 font-display font-bold text-primary-foreground shadow-lift transition-all hover:scale-[1.04] hover:bg-brand-navy-deep hover:shadow-2xl active:scale-[0.98] sm:left-6"
           aria-label="Abrir asistente virtual con IA"
         >
           <img
@@ -153,11 +153,16 @@ export function Assistant() {
                 onClick={() => setShowPolicyModal((v) => !v)}
                 aria-label="Políticas y aviso de IA"
                 title="Políticas y aviso de IA"
-                className="grid size-9 place-items-center rounded-full hover:bg-white/15"
+                className="grid size-9 cursor-pointer place-items-center rounded-full transition-colors hover:bg-white/20 active:scale-95"
               >
                 <Info weight="bold" className="size-5" />
               </button>
-              <button onClick={() => setIsOpen(false)} aria-label="Cerrar asistente" className="grid size-9 place-items-center rounded-full hover:bg-white/15">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                aria-label="Cerrar asistente"
+                className="grid size-9 cursor-pointer place-items-center rounded-full transition-colors hover:bg-white/20 active:scale-95"
+              >
                 <X weight="bold" className="size-5" />
               </button>
             </div>
@@ -174,7 +179,7 @@ export function Assistant() {
                   <button
                     type="button"
                     onClick={() => setShowPolicyModal(false)}
-                    className="grid size-8 place-items-center rounded-full hover:bg-muted"
+                    className="grid size-8 cursor-pointer place-items-center rounded-full transition-colors hover:bg-muted active:scale-95"
                     aria-label="Cerrar políticas"
                   >
                     <X weight="bold" className="size-4" />
@@ -192,7 +197,7 @@ export function Assistant() {
                   </p>
                   <p>
                     <strong>Tratamiento de datos personales:</strong> La información transmitida se procesa con fines de atención conforme a la Ley N.° 29733 y nuestra{" "}
-                    <a href={business.privacyUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-accent underline underline-offset-2">
+                    <a href={business.privacyUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-accent underline underline-offset-2 hover:text-accent-hover">
                       política de privacidad
                     </a>.
                   </p>
@@ -201,7 +206,7 @@ export function Assistant() {
                   <button
                     type="button"
                     onClick={() => setShowPolicyModal(false)}
-                    className="w-full rounded-full bg-primary py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90"
+                    className="w-full cursor-pointer rounded-full bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
                   >
                     Entendido
                   </button>
@@ -244,7 +249,7 @@ export function Assistant() {
                     <div className="flex items-start gap-2.5">
                       <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-accent/20 text-[0.65rem] font-bold text-accent">✓</span>
                       <p><strong>Consentimiento y privacidad:</strong> Tus consultas se tratan conforme a nuestra{" "}
-                        <a href={business.privacyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline underline-offset-2">
+                        <a href={business.privacyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline underline-offset-2 hover:text-accent-hover">
                           política de privacidad
                         </a>.
                       </p>
@@ -256,7 +261,7 @@ export function Assistant() {
                   <button
                     type="button"
                     onClick={handleAcceptConsent}
-                    className="w-full rounded-full bg-accent px-4 py-3 font-display text-sm font-bold text-accent-foreground shadow-sm transition hover:bg-accent-hover active:scale-[0.98]"
+                    className="w-full cursor-pointer rounded-full bg-accent px-4 py-3 font-display text-sm font-bold text-accent-foreground shadow-sm transition-all hover:bg-accent-hover hover:shadow-md hover:scale-[1.01] active:scale-[0.98]"
                   >
                     Acepto y deseo comenzar
                   </button>
@@ -276,7 +281,7 @@ export function Assistant() {
                     <button
                       type="button"
                       onClick={() => setShowPolicyModal(true)}
-                      className="font-bold text-accent hover:underline"
+                      className="cursor-pointer font-bold text-accent transition-colors hover:text-accent-hover hover:underline"
                     >
                       Políticas de IA
                     </button>
@@ -290,8 +295,9 @@ export function Assistant() {
                       {suggestions.map((s) => (
                         <button
                           key={s}
+                          type="button"
                           onClick={() => send(s)}
-                          className="rounded-full border-2 border-foreground/10 px-3.5 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent"
+                          className="cursor-pointer rounded-full border-2 border-foreground/10 px-3.5 py-1.5 text-sm font-semibold transition-all hover:border-accent hover:bg-accent/5 hover:text-accent active:scale-95"
                         >
                           {s}
                         </button>
@@ -325,7 +331,7 @@ export function Assistant() {
                       type="submit"
                       disabled={pending}
                       aria-label="Enviar"
-                      className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
+                      className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-accent text-accent-foreground shadow-xs transition-all hover:bg-accent-hover hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                     >
                       <PaperPlaneRight weight="fill" className="size-5" />
                     </button>
@@ -384,9 +390,10 @@ function MessageBubble({ message }: { message: Message }) {
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => add(p)}
                   aria-label={`Añadir ${p.name} al carrito`}
-                  className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover"
+                  className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full bg-accent text-accent-foreground transition-transform hover:bg-accent-hover hover:scale-110 active:scale-95"
                 >
                   <Plus weight="bold" className="size-4" />
                 </button>
