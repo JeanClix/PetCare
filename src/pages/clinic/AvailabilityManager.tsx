@@ -112,22 +112,55 @@ export function AvailabilityManager({ token, role }: { token: string; role: Staf
       <form onSubmit={handleSubmit} className="grid gap-4 rounded-card border border-border bg-card p-4 shadow-soft sm:grid-cols-2 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(12rem,0.8fr)_minmax(12rem,0.8fr)_auto] lg:items-end">
         <label className="block space-y-1.5 text-sm font-bold">
           <span>Desde</span>
-          <input required type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className={inputClass} />
+          <input
+            required
+            type="datetime-local"
+            value={startsAt}
+            onChange={(event) => {
+              setStartsAt(event.target.value);
+              setError("");
+            }}
+            className={inputClass}
+          />
         </label>
         <label className="block space-y-1.5 text-sm font-bold">
           <span>Hasta</span>
-          <input required type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className={inputClass} />
+          <input
+            required
+            type="datetime-local"
+            value={endsAt}
+            onChange={(event) => {
+              setEndsAt(event.target.value);
+              setError("");
+            }}
+            className={inputClass}
+          />
         </label>
         <label className="block space-y-1.5 text-sm font-bold">
           <span>Servicio</span>
-          <select required value={serviceId} onChange={(event) => setServiceId(event.target.value)} className={inputClass}>
+          <select
+            required
+            value={serviceId}
+            onChange={(event) => {
+              setServiceId(event.target.value);
+              setError("");
+            }}
+            className={inputClass}
+          >
             {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
           </select>
         </label>
         {role === "admin" && (
           <label className="block space-y-1.5 text-sm font-bold">
             <span>Veterinario <span className="font-normal text-muted-foreground">(opcional)</span></span>
-            <select value={veterinarianId} onChange={(event) => setVeterinarianId(event.target.value)} className={inputClass}>
+            <select
+              value={veterinarianId}
+              onChange={(event) => {
+                setVeterinarianId(event.target.value);
+                setError("");
+              }}
+              className={inputClass}
+            >
               <option value="">Sin asignar</option>
               {veterinarians.map((vet) => (
                 <option key={vet.id} value={vet.id}>{`${vet.firstname} ${vet.lastname}`.trim() || vet.email}</option>
