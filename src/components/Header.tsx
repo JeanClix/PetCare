@@ -7,25 +7,25 @@ import { Container } from "@/components/ui/Container";
 import { useAuth, type AuthUser } from "@/context/AuthContext";
 import { isStaffRole, roleLabels } from "@/lib/adminAuth";
 import { useCart } from "@/context/CartContext";
-import { business } from "@/data/site";
 import { cn } from "@/lib/utils";
-
-const nav = [
-  { to: "/", label: "Inicio" },
-  { to: "/tienda", label: "Tienda" },
-  { to: "/servicios", label: "Servicios" },
-  { to: "/citas", label: "Citas" },
-  { to: "/nosotros", label: "Nosotros" },
-  { to: "/contacto", label: "Contacto" },
-];
+import { useSiteContent } from "@/context/SiteContentContext";
+import { sitePhoneHref } from "@/lib/siteContent";
 
 export function Header() {
+  const { text } = useSiteContent();
+  const navItems = [
+    { to: "/", label: text("global.nav.home") },
+    { to: "/tienda", label: text("global.nav.shop") },
+    { to: "/servicios", label: text("global.nav.services") },
+    { to: "/citas", label: text("global.nav.appointments") },
+    { to: "/nosotros", label: text("global.nav.about") },
+    { to: "/contacto", label: text("global.nav.contact") },
+  ];
   const { count, open } = useCart();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const navItems = nav;
   const accountTarget = user && isStaffRole(user.role) ? "/admin" : "/cuenta";
 
   useEffect(() => setMenuOpen(false), [pathname]);
@@ -35,14 +35,14 @@ export function Header() {
       <div className="hidden bg-brand-navy-deep text-[0.8rem] text-white/80 md:block">
         <Container className="flex h-9 items-center justify-between">
           <span className="flex items-center gap-1.5">
-            <Clock weight="bold" /> {business.hours}
+            <Clock weight="bold" /> {text("global.hours")}
           </span>
           <div className="flex items-center gap-6">
-            <a href={business.phoneHref} className="flex items-center gap-1.5 hover:text-white">
-              <Phone weight="bold" /> {business.phone}
+            <a href={sitePhoneHref(text("global.phone"))} className="flex items-center gap-1.5 hover:text-white">
+              <Phone weight="bold" /> {text("global.phone")}
             </a>
-            <a href={business.emergencyHref} className="flex items-center gap-1.5 font-bold text-[#6fe0c4] hover:text-white">
-              <Siren weight="fill" /> Emergencias {business.emergency}
+            <a href={sitePhoneHref(text("global.emergency"))} className="flex items-center gap-1.5 font-bold text-[#6fe0c4] hover:text-white">
+              <Siren weight="fill" /> Emergencias {text("global.emergency")}
             </a>
           </div>
         </Container>
@@ -128,8 +128,8 @@ export function Header() {
                   </span>
                 </span>
               </Link>
-              <a href={business.emergencyHref} className="mt-3 flex items-center gap-2 rounded-xl bg-accent-soft px-4 py-3 font-bold text-accent">
-                <Siren weight="fill" /> Emergencias {business.emergency}
+              <a href={sitePhoneHref(text("global.emergency"))} className="mt-3 flex items-center gap-2 rounded-xl bg-accent-soft px-4 py-3 font-bold text-accent">
+                <Siren weight="fill" /> Emergencias {text("global.emergency")}
               </a>
             </Container>
           </nav>

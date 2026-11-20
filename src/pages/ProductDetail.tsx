@@ -3,12 +3,14 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { useCart } from "@/context/CartContext";
-import { categoryLabels, petLabels, products } from "@/data/products";
+import { categoryLabels, petLabels } from "@/data/products";
 import { formatPrice } from "@/lib/utils";
+import { useSiteContent } from "@/context/SiteContentContext";
 
 export function ProductDetail() {
+  const { content } = useSiteContent();
   const { productId } = useParams();
-  const product = products.find((item) => String(item.id) === productId);
+  const product = content.products.find((item) => String(item.id) === productId);
   const { add, open } = useCart();
 
   if (!product) return <Navigate to="/no-encontrado" replace />;

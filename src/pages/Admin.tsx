@@ -10,6 +10,7 @@ import {
   FirstAidKit,
   Gauge,
   Lightbulb,
+  PaintBrush,
   Receipt,
   ShareNetwork,
   UserGear,
@@ -29,6 +30,7 @@ import { AppointmentsBoard } from "@/pages/AppointmentsBoard";
 import { AvailabilityManager } from "@/pages/clinic/AvailabilityManager";
 import { PatientsView } from "@/pages/clinic/PatientsView";
 import { WhatsappSettings } from "@/pages/WhatsappSettings";
+import { SiteEditor } from "@/pages/SiteEditor";
 import { WhatsappComposer } from "@/components/staff/WhatsappComposer";
 import { PurchaseRegister } from "@/components/staff/PurchaseRegister";
 import type { WhatsappContext } from "@/lib/whatsapp";
@@ -61,7 +63,7 @@ const statusLabels: Record<CrmLeadStatus, string> = {
   closed: "Cerrado",
 };
 
-type AdminView = "dashboard" | "leads" | "purchases" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "availability" | "patients" | "whatsapp" | "social";
+type AdminView = "dashboard" | "leads" | "purchases" | "contacts" | "accounts" | "messages" | "marketing" | "analytics" | "recommendations" | "appointments" | "availability" | "patients" | "whatsapp" | "social" | "site";
 
 const adminViews: Record<AdminView, { label: string; description: string; icon: typeof Gauge; roles: StaffRole[] }> = {
   dashboard: { label: "Dashboard", description: "Resumen de solicitudes, contactos y mensajes guardados en Neon.", icon: Gauge, roles: ["admin", "sales"] },
@@ -78,6 +80,7 @@ const adminViews: Record<AdminView, { label: string; description: string; icon: 
   whatsapp: { label: "WhatsApp", description: "Número de la clínica enlazado y mensajes enviados desde el panel.", icon: WhatsappLogo, roles: ["admin"] },
   social: { label: "Redes Sociales", description: "Conecta Facebook e Instagram y publica contenido desde PetCare.", icon: ShareNetwork, roles: ["admin"] },
   accounts: { label: "Cuentas y roles", description: "Asigna los roles cliente, administrador, veterinario o ventas.", icon: UserGear, roles: ["admin"] },
+  site: { label: "Editor del sitio", description: "Edita textos, imágenes y colores de las páginas públicas.", icon: PaintBrush, roles: ["admin"] },
 };
 
 const adminSections: Array<{ label: string; views: AdminView[] }> = [
@@ -85,7 +88,7 @@ const adminSections: Array<{ label: string; views: AdminView[] }> = [
   { label: "Ventas", views: ["leads", "purchases", "contacts", "messages"] },
   { label: "Clínica", views: ["appointments", "availability", "patients"] },
   { label: "Marketing", views: ["marketing", "social", "analytics", "recommendations"] },
-  { label: "Administración", views: ["accounts", "whatsapp"] },
+  { label: "Administración", views: ["accounts", "whatsapp", "site"] },
 ];
 
 const typeLabels: Record<CrmLeadType, string> = {
@@ -311,7 +314,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
         description={current.description}
         user={user}
         onLogout={onLogout}
-        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "availability" && activeView !== "whatsapp" && activeView !== "social" && (
+        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "availability" && activeView !== "whatsapp" && activeView !== "social" && activeView !== "site" && (
           <Button
             variant="outline"
             size="sm"
@@ -352,6 +355,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
         {activeView === "patients" && <PatientsView token={token} selectedId={selectedPatientId} onSelect={setSelectedPatientId} />}
 
         {activeView === "accounts" && <AdminAccounts token={token} currentEmail={user.email} />}
+        {activeView === "site" && <SiteEditor token={token} />}
 
         {activeView === "dashboard" && <section aria-labelledby="lifecycle-heading" className="space-y-3 rounded-media border border-border bg-card p-5 shadow-soft">
           <div>
@@ -1105,39 +1109,136 @@ function DigitalAnalytics({
   const whatsapp = visibleLeads.filter((lead) => lead.channel === "whatsapp").length;
   const orderRequests = visibleLeads.filter((lead) => lead.type === "order").length;
   const appointments = visibleLeads.filter((lead) => lead.type === "appointment").length;
+  const otherChannels = visibleLeads.length - forms - whatsapp;
+  const formShare = visibleLeads.length ? forms / visibleLeads.length * 100 : 0;
+  const whatsappShare = visibleLeads.length ? whatsapp / visibleLeads.length * 100 : 0;
+  const buckets = useMemo(() => {
+    if (!filter.range) return [];
+    const dayCount = Math.max(1, Math.round((filter.range.end.getTime() - filter.range.start.getTime()) / 86_400_000));
+    const bucketDays = Math.max(1, Math.ceil(dayCount / 14));
+    return Array.from({ length: Math.ceil(dayCount / bucketDays) }, (_, index) => {
+      const start = addDays(filter.range!.start, index * bucketDays);
+      const end = new Date(Math.min(addDays(start, bucketDays).getTime(), filter.range!.end.getTime()));
+      return {
+        label: start.toLocaleDateString("es-PE", { day: "2-digit", month: "short" }),
+        count: visibleLeads.filter((lead) => inBounds(lead.createdAt, { start, end })).length,
+      };
+    });
+  }, [visibleLeads, filter.range]);
+  const maxBucketCount = Math.max(1, ...buckets.map((bucket) => bucket.count));
+  const linePoints = buckets.map((bucket, index) => {
+    const x = buckets.length < 2 ? 320 : 24 + index * (612 / (buckets.length - 1));
+    const y = 172 - bucket.count / maxBucketCount * 142;
+    return { x, y, ...bucket };
+  });
+  const linePath = linePoints.map(({ x, y }, index) => `${index ? "L" : "M"}${x},${y}`).join(" ");
+  const eventMix = [
+    { label: "Solicitudes de cita", value: appointments, color: "bg-accent" },
+    { label: "Pedidos iniciados", value: orderRequests, color: "bg-brand-navy" },
+  ];
+  const maxEventCount = Math.max(1, appointments, orderRequests);
 
   return (
     <section className="space-y-6" aria-labelledby="digital-analytics-heading">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="digital-analytics-heading" className="font-display text-2xl font-black text-primary">Analítica digital</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Separa actividad registrada en PetCare del tráfico medido por una plataforma externa.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Resumen visual de las interacciones registradas en PetCare.</p>
         </div>
         <PeriodFilter filter={filter} />
       </div>
       {!filter.range && <p role="alert" className="rounded-xl bg-danger/5 px-4 py-3 text-sm text-danger">El rango personalizado no es válido. Selecciona fechas correctas.</p>}
-      <section className="rounded-media border border-border bg-card p-5 shadow-soft">
-        <h3 className="font-display text-lg font-black text-primary">Actividad interna · solicitudes del CRM</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Son formularios o solicitudes enviadas a través de WhatsApp; no equivalen a sesiones, usuarios, carritos ni compras.</p>
-        <p className="mt-2 text-xs text-muted-foreground">Periodo: {rangeDescription(filter.range)}</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Solicitudes por formulario" value={filter.range ? forms : "—"} tone="accent" />
-          <StatCard label="Solicitudes por WhatsApp" value={filter.range ? whatsapp : "—"} tone="navy" />
-          <StatCard label="Pedidos iniciados, sin pago confirmado" value={filter.range ? orderRequests : "—"} tone="green" />
-          <StatCard label="Solicitudes de cita" value={filter.range ? appointments : "—"} tone="sky" />
-        </div>
-        {visibleLeads.length === 0 && <p className="mt-4 text-sm text-muted-foreground">No hay eventos CRM en este periodo. No se calcula una tasa de conversión porque no hay denominador fiable de sesiones o usuarios.</p>}
-        <p className="mt-4 text-sm text-muted-foreground">Contactos creados en el periodo: <strong className="text-foreground">{filter.range ? visibleContacts.length : "—"}</strong>.</p>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Solicitudes registradas" value={filter.range ? visibleLeads.length : "—"} tone="accent" />
+        <StatCard label="Contactos nuevos" value={filter.range ? visibleContacts.length : "—"} tone="navy" />
+        <StatCard label="Formularios" value={filter.range ? forms : "—"} tone="green" />
+        <StatCard label="Solicitudes por WhatsApp" value={filter.range ? whatsapp : "—"} tone="sky" />
+      </div>
+      <section className="grid gap-4 xl:grid-cols-[1.65fr_1fr]" aria-label="Actividad y canales">
+        <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-display text-lg font-black text-primary">Solicitudes en el tiempo</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Actividad capturada por día o periodo · {rangeDescription(filter.range)}</p>
+            </div>
+            <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">CRM</span>
+          </div>
+          {buckets.length > 0 && visibleLeads.length > 0 ? (
+            <div className="mt-5">
+              <svg role="img" aria-label="Gráfico de solicitudes CRM a lo largo del periodo" viewBox="0 0 660 210" className="h-56 w-full overflow-visible">
+                <title>Solicitudes CRM a lo largo del periodo</title>
+                {[30, 75, 120, 172].map((y) => <line key={y} x1="20" y1={y} x2="640" y2={y} stroke="var(--color-border)" strokeDasharray="4 5" />)}
+                <path d={`${linePath} L${linePoints.at(-1)?.x ?? 24},172 L${linePoints[0]?.x ?? 24},172 Z`} fill="var(--color-accent)" opacity="0.11" />
+                <path d={linePath} fill="none" stroke="var(--color-accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                {linePoints.map((point, index) => <circle key={`${point.label}-${index}`} cx={point.x} cy={point.y} r="4" fill="var(--color-accent)" stroke="var(--color-card)" strokeWidth="2"><title>{point.label}: {point.count} solicitudes</title></circle>)}
+              </svg>
+              <div className="flex justify-between px-1 text-xs text-muted-foreground">
+                <span>{buckets[0]?.label}</span>
+                {buckets.length > 2 && <span>{buckets[Math.floor(buckets.length / 2)]?.label}</span>}
+                <span>{buckets.at(-1)?.label}</span>
+              </div>
+            </div>
+          ) : (
+            <EmptyState title="Aún no hay actividad" description="Las solicitudes capturadas aparecerán en este gráfico." />
+          )}
+        </article>
+        <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+          <h3 className="font-display text-lg font-black text-primary">Canales de captura</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Solicitudes recibidas en el CRM</p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-6">
+            <div
+              role="img"
+              aria-label={`Canales CRM: ${forms} por formulario, ${whatsapp} por WhatsApp y ${otherChannels} otros`}
+              className="grid size-40 shrink-0 place-items-center rounded-full"
+              style={{ background: visibleLeads.length ? `conic-gradient(var(--color-accent) 0 ${formShare}%, var(--color-brand-navy) ${formShare}% ${formShare + whatsappShare}%, var(--color-muted) ${formShare + whatsappShare}% 100%)` : "var(--color-muted)" }}
+            >
+              <div className="grid size-24 place-items-center rounded-full bg-card text-center">
+                <span><strong className="block font-display text-2xl text-primary">{filter.range ? visibleLeads.length : "—"}</strong><span className="text-xs text-muted-foreground">solicitudes</span></span>
+              </div>
+            </div>
+            <dl className="grid gap-3 text-sm">
+              <ChannelLegend color="bg-accent" label="Formulario" count={filter.range ? forms : "—"} />
+              <ChannelLegend color="bg-brand-navy" label="WhatsApp" count={filter.range ? whatsapp : "—"} />
+              <ChannelLegend color="bg-muted" label="Otros" count={filter.range ? otherChannels : "—"} />
+            </dl>
+          </div>
+        </article>
       </section>
-      <section className="rounded-media border border-border bg-card p-5 shadow-soft">
-        <h3 className="font-display text-lg font-black text-primary">Tráfico web y atribución</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          No hay una plataforma de analítica web configurada para consultar informes desde el panel.
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">Google Analytics 4 no está integrado. Fuentes de tráfico, páginas visitadas, eventos de carrito, inicio de compra y compras completadas no están disponibles. No se estiman ni se muestran como cero.</p>
+      <section className="grid gap-4 lg:grid-cols-2" aria-label="Desglose de actividad">
+        <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+          <h3 className="font-display text-lg font-black text-primary">Tipo de solicitud</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Los pedidos iniciados no son ventas pagadas.</p>
+          <div className="mt-5 space-y-4">
+            {eventMix.map((item) => (
+              <div key={item.label}>
+                <div className="mb-1.5 flex justify-between gap-3 text-sm"><span>{item.label}</span><strong>{filter.range ? item.value : "—"}</strong></div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", item.color)} style={{ width: `${item.value / maxEventCount * 100}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+          <h3 className="font-display text-lg font-black text-primary">Qué representan estos datos</h3>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            El panel muestra formularios, solicitudes de WhatsApp, citas y pedidos iniciados guardados en el CRM; no son sesiones ni usuarios únicos.
+            No se calculan tasas de conversión ni ingresos sin una fuente de visitas y pagos confirmados.
+          </p>
+          <p className="mt-3 rounded-xl bg-muted/70 px-4 py-3 text-sm font-semibold text-primary">
+            Google Analytics 4 no está conectado. Visitas, páginas vistas y fuentes de tráfico no están disponibles y no se muestran como cero.
+          </p>
+        </article>
       </section>
-      <p className="text-sm text-muted-foreground">Para habilitar informes externos se requiere una integración de servidor con credenciales privadas protegidas y una propiedad de analítica; no se deben colocar secretos en variables VITE_ ni en el navegador. El procedimiento pendiente está descrito en docs/admin.md.</p>
     </section>
+  );
+}
+
+function ChannelLegend({ color, label, count }: { color: string; label: string; count: string | number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={cn("size-2.5 rounded-full", color)} />
+      <dt>{label}</dt>
+      <dd className="ml-auto font-bold tabular-nums">{count}</dd>
+    </div>
   );
 }
 
