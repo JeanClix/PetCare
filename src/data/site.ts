@@ -13,7 +13,7 @@ export const business = {
   emergency: "958 967 721",
   emergencyHref: "tel:+51958967721",
   whatsapp: "51958967721",
-  hours: "Lunes a sábado, 9:00 a.m. a 6:00 p.m.",
+  hours: "Lunes a sábado: 09:00–13:00 y 13:00–15:15.",
   instagram: "https://www.instagram.com/petcareperu/",
   mapsEmbed:
     "https://www.google.com/maps?q=Av.+Aviaci%C3%B3n+4945,+Santiago+de+Surco,+Lima&output=embed",

@@ -33,7 +33,7 @@ export const defaultSiteContent: SiteContent = {
     ...serviceTextDefaults,
     ...testimonialTextDefaults,
     ...brandTextDefaults,
-    "global.hours": "Lunes a sábado, 9:00 a.m. a 6:00 p.m.",
+    "global.hours": "Lunes a sábado: 09:00–13:00 y 13:00–15:15.",
     "global.phone": "(01) 628 7515",
     "global.emergency": "958 967 721",
     "global.nav.home": "Inicio",
@@ -277,6 +277,10 @@ export function mergeSiteContent(value: unknown): SiteContent {
       }
     }),
   );
+  const mergedTexts = { ...defaultSiteContent.texts, ...validTexts };
+  if (mergedTexts["global.hours"] === "Lunes a sábado, 9:00 a.m. a 6:00 p.m.") {
+    mergedTexts["global.hours"] = defaultSiteContent.texts["global.hours"];
+  }
   const productUpdates: Product[] = Array.isArray(content.products) ? content.products : [];
   const validProducts = catalogProducts.map((product) => {
     const updated = productUpdates.find((item) => item.id === product.id);
@@ -307,7 +311,7 @@ export function mergeSiteContent(value: unknown): SiteContent {
   });
   const isHexColor = (color: unknown): color is string => typeof color === "string" && /^#[\da-f]{6}$/i.test(color);
   return {
-    texts: { ...defaultSiteContent.texts, ...validTexts },
+    texts: mergedTexts,
     images: { ...defaultSiteContent.images, ...validImages },
     products: validProducts,
     colors: {
