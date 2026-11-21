@@ -32,7 +32,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40">
-      <div className="hidden bg-brand-navy-deep text-[0.8rem] text-white/80 md:block">
+      <div className="hidden bg-brand-navy-deep text-[0.8rem] text-white/80 md:block" data-site-group="global">
         <Container className="flex h-9 items-center justify-between">
           <span className="flex items-center gap-1.5">
             <Clock weight="bold" /> {text("global.hours")}
@@ -52,7 +52,7 @@ export function Header() {
         <Container className="flex h-[4.25rem] items-center justify-between gap-4">
           <Logo />
 
-          <nav className="hidden items-center gap-7 lg:flex" aria-label="Principal">
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Principal" data-site-group="global.nav">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}

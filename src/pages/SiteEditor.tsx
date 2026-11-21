@@ -3,66 +3,14 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { useSiteContent } from "@/context/SiteContentContext";
 import { defaultSiteContent, siteImageFields, siteTextFields, type SiteContent } from "@/lib/siteContent";
+import { groupFields } from "@/lib/siteFieldGroups";
 import { uploadSiteImage } from "@/lib/adminAuth";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/data/products";
 
 const sections = ["Inicio", "Servicios", "Tienda", "Nosotros", "Contacto", "Citas", "Cuenta", "Otros", "Información pública"];
 
-// Agrupa los campos de texto por bloque de la página para que secciones largas (como "Inicio")
-// no se vean como una lista plana de 50+ campos sin relación aparente entre ellos.
-const FIELD_GROUP_LABELS: Record<string, string> = {
-  "home.hero": "Portada principal",
-  "home.highlights": "Datos destacados",
-  "home.services": "Servicios en la portada",
-  "home.travel": "Sección de viajes",
-  "home.products": "Productos destacados",
-  "home.brands": "Marcas que trabajamos",
-  "brand": "Marcas que trabajamos",
-  "home.testimonials": "Testimonios",
-  "testimonial": "Testimonios",
-  "home.visit": "Cómo visitarnos",
-  "about.page": "Encabezado de la página",
-  "about.intro": "Nuestra historia",
-  "about.values": "Nuestros valores",
-  "about.value": "Nuestros valores",
-  "services.page": "Encabezado de la página",
-  "services.travel": "Servicio de viajes",
-  "service": "Servicios por tipo",
-  "shop.page": "Encabezado de la página",
-  "contact.page": "Encabezado de la página",
-  "contact.form": "Formulario de contacto",
-  "appointments.page": "Encabezado de la página",
-  "account.page": "Encabezado de la página",
-  "account.login": "Inicio de sesión",
-  "account.register": "Registro",
-  "account.email": "Campos del formulario",
-  "account.username": "Campos del formulario",
-  "account.password": "Campos del formulario",
-  "notFound": "Página no encontrada",
-  "global.nav": "Menú de navegación",
-  global: "Datos de contacto generales",
-};
-
-function fieldGroupLabel(key: string) {
-  const segments = key.split(".");
-  for (let length = 2; length >= 1; length -= 1) {
-    const prefix = segments.slice(0, length).join(".");
-    if (FIELD_GROUP_LABELS[prefix]) return FIELD_GROUP_LABELS[prefix];
-  }
-  return "Otros textos";
-}
-
-function groupFields<T extends { key: string }>(fields: T[]) {
-  const groups = new Map<string, T[]>();
-  for (const field of fields) {
-    const label = fieldGroupLabel(field.key);
-    groups.set(label, [...(groups.get(label) ?? []), field]);
-  }
-  return [...groups.entries()];
-}
-
-function isSafeImageSource(source: string) {
+export function isSafeImageSource(source: string) {
   try {
     const url = new URL(source, window.location.origin);
     return url.protocol === "https:" || (
@@ -340,7 +288,7 @@ export function SiteEditor({ token }: { token: string }) {
   );
 }
 
-function ProductEditorCard({
+export function ProductEditorCard({
   product,
   disabled,
   uploading,
@@ -389,7 +337,7 @@ function ProductEditorCard({
   );
 }
 
-function ColorField({ label, value, disabled, onChange }: { label: string; value: string; disabled: boolean; onChange: (value: string) => void }) {
+export function ColorField({ label, value, disabled, onChange }: { label: string; value: string; disabled: boolean; onChange: (value: string) => void }) {
   return (
     <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 text-sm font-bold">
       {label}

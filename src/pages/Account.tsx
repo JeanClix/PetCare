@@ -71,7 +71,7 @@ export function Account() {
   if (user?.role === "customer") {
     return (
       <>
-        <PageHeader title={text("account.page.title")} description={text("account.page.description")} />
+        <PageHeader title={text("account.page.title")} description={text("account.page.description")} group="account.page" />
         <Container className="py-10 sm:py-14">
           <div className="mx-auto max-w-3xl space-y-5">
           <section className="space-y-5 rounded-media border border-border bg-card p-6 shadow-soft sm:p-8">

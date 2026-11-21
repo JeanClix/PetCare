@@ -30,7 +30,7 @@ import { AppointmentsBoard } from "@/pages/AppointmentsBoard";
 import { AvailabilityManager } from "@/pages/clinic/AvailabilityManager";
 import { PatientsView } from "@/pages/clinic/PatientsView";
 import { WhatsappSettings } from "@/pages/WhatsappSettings";
-import { SiteEditor } from "@/pages/SiteEditor";
+import { VisualSiteEditor } from "@/pages/VisualSiteEditor";
 import { WhatsappComposer } from "@/components/staff/WhatsappComposer";
 import { PurchaseRegister } from "@/components/staff/PurchaseRegister";
 import type { WhatsappContext } from "@/lib/whatsapp";
@@ -304,6 +304,10 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
   const current = adminViews[activeView];
   const showsCrmToolbar = activeView === "leads" || activeView === "purchases" || activeView === "contacts" || activeView === "messages";
 
+  if (activeView === "site") {
+    return <VisualSiteEditor token={token} onExit={() => setActiveView(canReadCrm ? "dashboard" : "appointments")} />;
+  }
+
   return (
     <>
       <StaffShell
@@ -314,7 +318,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
         description={current.description}
         user={user}
         onLogout={onLogout}
-        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "availability" && activeView !== "whatsapp" && activeView !== "social" && activeView !== "site" && (
+        actions={activeView !== "accounts" && activeView !== "patients" && activeView !== "availability" && activeView !== "whatsapp" && activeView !== "social" && (
           <Button
             variant="outline"
             size="sm"
@@ -355,7 +359,6 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
         {activeView === "patients" && <PatientsView token={token} selectedId={selectedPatientId} onSelect={setSelectedPatientId} />}
 
         {activeView === "accounts" && <AdminAccounts token={token} currentEmail={user.email} />}
-        {activeView === "site" && <SiteEditor token={token} />}
 
         {activeView === "dashboard" && <section aria-labelledby="lifecycle-heading" className="space-y-3 rounded-media border border-border bg-card p-5 shadow-soft">
           <div>

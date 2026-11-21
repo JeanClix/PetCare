@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Assistant } from "@/components/Assistant";
 import { CartDrawer } from "@/components/CartDrawer";
+import { EditorPreviewBridge } from "@/components/EditorPreviewBridge";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 
@@ -102,6 +103,7 @@ export function App() {
       >
         Saltar al contenido
       </a>
+      <EditorPreviewBridge />
       <ScrollManager />
       <Header />
       <main id="main" tabIndex={-1} className="flex-1 outline-none">

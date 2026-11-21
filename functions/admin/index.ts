@@ -36,7 +36,11 @@ const WHATSAPP_SEND_ACTIONS = ["whatsapp-send", "whatsapp-history"];
 const SOCIAL_ADMIN_ACTIONS = [
   "social-status", "social-connect", "social-select", "social-disconnect", "social-upload", "social-publish",
 ];
-const SITE_ADMIN_ACTIONS = ["site-content", "site-image-upload"];
+const SITE_ADMIN_ACTIONS = [
+  "site-content", "site-image-upload",
+  "site-draft", "site-draft-save", "site-publish", "site-discard-draft",
+];
+const SITE_LARGE_BODY_ACTIONS = new Set(["site-content", "site-draft", "site-draft-save", "site-publish", "site-discard-draft"]);
 const SITE_CONTENT_KEY = /^[a-zA-Z0-9._-]{1,100}$/;
 const SITE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -630,6 +634,15 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
   await sql`CREATE INDEX IF NOT EXISTS petcare_social_posts_created_idx ON petcare_social_posts (created_at DESC)`;
   await sql`
     CREATE TABLE IF NOT EXISTS petcare_site_content (
+      id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      content JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  // Borrador del editor visual: separado de lo publicado para que las ediciones
+  // no afecten el sitio público hasta que el administrador confirme "Publicar".
+  await sql`
+    CREATE TABLE IF NOT EXISTS petcare_site_content_draft (
       id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
       content JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -1540,7 +1553,7 @@ export default {
         return response({ mediaId }, 201, origin);
       }
 
-      const body = await parseJsonBody(request, action === "site-content" ? 1024 * 1024 : undefined);
+      const body = await parseJsonBody(request, SITE_LARGE_BODY_ACTIONS.has(action) ? 1024 * 1024 : undefined);
       if (action === "site-content") {
         const content = validateSiteContent(body?.content);
         if (!content) return response({ error: "Revisa los textos, imágenes y colores antes de publicar." }, 400, origin);
@@ -1549,6 +1562,53 @@ export default {
           VALUES (1, ${JSON.stringify(content)}::jsonb, now())
           ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at
         `;
+        return response({ content }, 200, origin);
+      }
+      if (action === "site-draft") {
+        const draftRows = await sql`SELECT content FROM petcare_site_content_draft WHERE id = 1 LIMIT 1`;
+        if (draftRows[0]?.content) return response({ content: draftRows[0].content, hasDraft: true }, 200, origin);
+        // Sin borrador todavía: se parte de lo publicado para que el editor abra mostrando el sitio real.
+        const publishedRows = await sql`SELECT content FROM petcare_site_content WHERE id = 1 LIMIT 1`;
+        return response({ content: publishedRows[0]?.content ?? null, hasDraft: false }, 200, origin);
+      }
+      if (action === "site-draft-save") {
+        const content = validateSiteContent(body?.content);
+        if (!content) return response({ error: "Revisa los textos, imágenes y colores antes de guardar el borrador." }, 400, origin);
+        await sql`
+          INSERT INTO petcare_site_content_draft (id, content, updated_at)
+          VALUES (1, ${JSON.stringify(content)}::jsonb, now())
+          ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at
+        `;
+        return response({ content }, 200, origin);
+      }
+      if (action === "site-publish") {
+        const content = validateSiteContent(body?.content);
+        if (!content) return response({ error: "Revisa los textos, imágenes y colores antes de publicar." }, 400, origin);
+        await sql`
+          INSERT INTO petcare_site_content (id, content, updated_at)
+          VALUES (1, ${JSON.stringify(content)}::jsonb, now())
+          ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at
+        `;
+        // Publicar también deja el borrador alineado con lo recién publicado.
+        await sql`
+          INSERT INTO petcare_site_content_draft (id, content, updated_at)
+          VALUES (1, ${JSON.stringify(content)}::jsonb, now())
+          ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at
+        `;
+        return response({ content }, 200, origin);
+      }
+      if (action === "site-discard-draft") {
+        const publishedRows = await sql`SELECT content FROM petcare_site_content WHERE id = 1 LIMIT 1`;
+        const content = publishedRows[0]?.content ?? null;
+        if (content) {
+          await sql`
+            INSERT INTO petcare_site_content_draft (id, content, updated_at)
+            VALUES (1, ${JSON.stringify(content)}::jsonb, now())
+            ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at
+          `;
+        } else {
+          await sql`DELETE FROM petcare_site_content_draft WHERE id = 1`;
+        }
         return response({ content }, 200, origin);
       }
       if (action === "book-appointment") {

@@ -330,3 +330,23 @@ export async function saveSiteContent(token: string, content: SiteContent) {
   const result = await adminRequest<{ content: SiteContent }>("/site-content", { content }, token);
   return mergeSiteContent(result.content);
 }
+
+export async function fetchSiteDraft(token: string) {
+  const result = await adminRequest<{ content: SiteContent | null; hasDraft: boolean }>("/site-draft", {}, token);
+  return { content: mergeSiteContent(result.content), hasDraft: result.hasDraft };
+}
+
+export async function saveSiteDraft(token: string, content: SiteContent) {
+  const result = await adminRequest<{ content: SiteContent }>("/site-draft-save", { content }, token);
+  return mergeSiteContent(result.content);
+}
+
+export async function publishSiteContent(token: string, content: SiteContent) {
+  const result = await adminRequest<{ content: SiteContent }>("/site-publish", { content }, token);
+  return mergeSiteContent(result.content);
+}
+
+export async function discardSiteDraft(token: string) {
+  const result = await adminRequest<{ content: SiteContent | null }>("/site-discard-draft", {}, token);
+  return mergeSiteContent(result.content);
+}

@@ -40,7 +40,7 @@ export function Home() {
 function Hero() {
   const { text, image } = useSiteContent();
   return (
-    <section className="overflow-hidden">
+    <section className="overflow-hidden" data-site-group="home.hero">
       <Container className="grid items-center gap-12 pt-10 pb-16 sm:pt-14 lg:grid-cols-[1.15fr_1fr] lg:gap-10 lg:pt-16 lg:pb-20">
         <div className="animate-fade-up">
           <p className="mb-3 font-display text-base font-extrabold text-accent italic">
@@ -101,7 +101,7 @@ function Highlights() {
     { value: text("home.highlights.homeVisits"), label: text("home.highlights.homeVisitsLabel") },
   ];
   return (
-    <section className="border-y border-border bg-card">
+    <section className="border-y border-border bg-card" data-site-group="home.highlights">
       <Container className="grid grid-cols-2 lg:grid-cols-4">
         {items.map((item, i) => (
           <div
@@ -127,7 +127,7 @@ function ServicesBento() {
   const consultas = byId("consultas", text);
   const banos = byId("banos", text);
   return (
-    <section className="py-14 sm:py-16">
+    <section className="py-14 sm:py-16" data-site-group="home.services">
       <Container>
         <div className="reveal flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <SectionHeading title={text("home.highlights.title")} />
@@ -192,7 +192,7 @@ function TravelFeature() {
   const { text, image } = useSiteContent();
   const travel = byId("viajes", text);
   return (
-    <section className="pb-14 sm:pb-16">
+    <section className="pb-14 sm:pb-16" data-site-group="home.travel">
       <Container>
         <div className="reveal grid overflow-hidden rounded-media bg-brand-navy text-white lg:grid-cols-[1fr_0.85fr]">
           <div className="p-6 sm:p-8">
@@ -233,7 +233,7 @@ function ProductsRow() {
   const { content, text } = useSiteContent();
   const featuredProducts = content.products.slice(0, 8);
   return (
-    <section className="border-t border-border bg-card py-14 sm:py-16">
+    <section className="border-t border-border bg-card py-14 sm:py-16" data-site-group="home.products">
       <Container>
         <div className="reveal flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <SectionHeading
@@ -263,7 +263,7 @@ function BrandsMarquee() {
   }));
   const row = [...editableBrands, ...editableBrands];
   return (
-    <section className="overflow-hidden border-y border-border bg-card py-10" aria-labelledby="brands-title">
+    <section className="overflow-hidden border-y border-border bg-card py-10" aria-labelledby="brands-title" data-site-group="home.brands">
       <Container>
         <h2 id="brands-title" className="text-center font-display text-base font-extrabold text-muted-foreground">
           {text("home.brands.title")}
@@ -290,7 +290,7 @@ function Testimonials() {
     detail: text(`testimonial.${index}.detail`),
   }));
   return (
-    <section className="py-14 sm:py-16">
+    <section className="py-14 sm:py-16" data-site-group="home.testimonials">
       <Container>
         <SectionHeading eyebrow={text("home.testimonials.eyebrow")} title={text("home.testimonials.title")} className="reveal" />
         <div className="mt-10 grid gap-5 lg:grid-cols-[1.35fr_1fr]">
@@ -324,7 +324,7 @@ function Testimonials() {
 export function VisitUs() {
   const { text } = useSiteContent();
   return (
-    <section className="pb-14 sm:pb-16">
+    <section className="pb-14 sm:pb-16" data-site-group="home.visit">
       <Container>
         <div className="reveal grid gap-10 rounded-media bg-accent-soft p-8 sm:p-12 lg:grid-cols-[1.2fr_1fr] lg:items-center">
           <div>

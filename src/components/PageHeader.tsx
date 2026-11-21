@@ -6,14 +6,17 @@ export function PageHeader({
   description,
   image,
   children,
+  group,
 }: {
   title: ReactNode;
   description?: ReactNode;
   image?: { src: string; alt: string };
   children?: ReactNode;
+  /** Prefijo data-site-group (p.ej. "services.page") para el editor visual. */
+  group?: string;
 }) {
   return (
-    <section className="border-b border-border bg-sky/60">
+    <section className="border-b border-border bg-sky/60" data-site-group={group}>
       <Container className="grid items-end gap-6 pt-10 pb-8 sm:pt-12 sm:pb-10 md:grid-cols-[1fr_auto]">
         <div className="animate-fade-up">
           <h1 className="max-w-3xl text-4xl leading-[1.05] font-black text-primary sm:text-5xl">{title}</h1>

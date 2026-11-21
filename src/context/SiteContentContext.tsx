@@ -2,9 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import {
   defaultSiteContent,
   fetchSiteContent,
+  mergeSiteContent,
   saveSiteContent,
   type SiteContent,
 } from "@/lib/siteContent";
+import { HOST_TO_PREVIEW_SOURCE, isEditorPreview, postToHost } from "@/lib/editorPreview";
 
 type SiteContentContextValue = {
   content: SiteContent;
@@ -19,12 +21,16 @@ type SiteContentContextValue = {
 const SiteContentContext = createContext<SiteContentContextValue | null>(null);
 
 export function SiteContentProvider({ children }: { children: ReactNode }) {
+  const preview = isEditorPreview();
   const [content, setContent] = useState(defaultSiteContent);
-  const [loading, setLoading] = useState(true);
+  // En modo previsualización del editor no hay nada que cargar de la red: el contenido
+  // llega por postMessage desde el editor (admin), así que no mostramos un estado de carga.
+  const [loading, setLoading] = useState(!preview);
   const [loadError, setLoadError] = useState("");
   const [loadVersion, setLoadVersion] = useState(0);
 
   useEffect(() => {
+    if (preview) return;
     let active = true;
     setLoading(true);
     setLoadError("");
@@ -36,7 +42,23 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
       if (active) setLoading(false);
     });
     return () => { active = false; };
-  }, [loadVersion]);
+  }, [loadVersion, preview]);
+
+  // Modo previsualización: avisamos al editor que estamos listos para recibir el contenido
+  // en edición, y nos quedamos escuchando cada actualización que nos empuje (sin red).
+  useEffect(() => {
+    if (!preview) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { source?: string; type?: string; content?: SiteContent } | undefined;
+      if (data?.source !== HOST_TO_PREVIEW_SOURCE || data.type !== "content" || !data.content) return;
+      setContent(mergeSiteContent(data.content));
+      setLoading(false);
+    };
+    window.addEventListener("message", onMessage);
+    postToHost({ source: "petcare-editor-preview", type: "ready" });
+    return () => window.removeEventListener("message", onMessage);
+  }, [preview]);
 
   useEffect(() => {
     const root = document.documentElement;

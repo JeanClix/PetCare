@@ -279,6 +279,7 @@ export function AppointmentBooking() {
         title={text("appointments.page.title")}
         description={text("appointments.page.description")}
         image={{ src: image("appointments.image"), alt: "Corgi mirando a la cámara" }}
+        group="appointments.page"
       />
 
       <Container className="grid gap-10 py-14 sm:py-20 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">

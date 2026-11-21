@@ -72,10 +72,11 @@ export function Contact() {
         title={text("contact.page.title")}
         description={text("contact.page.description")}
         image={{ src: image("contact.image"), alt: "Corgi mirando a la cámara" }}
+        group="contact.page"
       />
 
       <Container className="grid gap-8 py-10 sm:py-14 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="h-fit rounded-media border border-border bg-card p-5 shadow-soft sm:p-8" aria-labelledby="contact-form-title">
+        <section className="h-fit rounded-media border border-border bg-card p-5 shadow-soft sm:p-8" aria-labelledby="contact-form-title" data-site-group="contact.form">
           {status === "sent" ? (
             <div role="status" className="space-y-5">
               <div className="flex items-start gap-3">

@@ -68,6 +68,7 @@ export function Shop() {
       <PageHeader
         title={text("shop.page.title")}
         description={text("shop.page.description")}
+        group="shop.page"
       />
 
       <Container className="py-6 sm:py-8">
@@ -145,7 +146,7 @@ export function Shop() {
         </div>
 
         {results.length > 0 ? (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" data-site-group="shop.products">
             {results.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

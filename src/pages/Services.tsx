@@ -28,6 +28,7 @@ export function Services() {
       <PageHeader
         title={text("services.page.title")}
         description={text("services.page.description")}
+        group="services.page"
       />
 
       <Container className="space-y-5 py-10 sm:py-14">
@@ -37,7 +38,7 @@ export function Services() {
           imageAlt="Veterinaria examinando a un gato durante una consulta"
         />
 
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2" data-site-group="service">
           {regular.map((s, i) => (
             <article
               key={s.id}
@@ -69,7 +70,7 @@ export function Services() {
         />
       </Container>
 
-      <section className="border-y border-border bg-card py-14 sm:py-16">
+      <section className="border-y border-border bg-card py-14 sm:py-16" data-site-group="services.travel">
         <Container>
           <SectionHeading
             eyebrow="Tranquilo, podemos ayudarte"

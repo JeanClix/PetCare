@@ -39,7 +39,7 @@ export function Footer() {
   return (
     <footer className="bg-brand-navy-deep text-white/75">
       <Container className="grid gap-10 pt-14 pb-10 md:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-5">
+        <div className="space-y-5" data-site-group="global">
           <Logo inverted />
           <address className="max-w-sm text-[0.95rem] leading-relaxed not-italic">
             {business.address}

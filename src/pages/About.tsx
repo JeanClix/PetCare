@@ -25,9 +25,10 @@ export function About() {
       <PageHeader
         title={text("about.page.heading")}
         description={text("about.page.description")}
+        group="about.page"
       />
 
-      <Container className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[1fr_1.05fr]">
+      <Container className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[1fr_1.05fr]" data-site-group="about.intro">
         <div className="reveal space-y-4 leading-relaxed text-muted-foreground">
           <SectionHeading title={text("about.intro.title")} />
           <p>{text("about.intro.description")}</p>
@@ -45,7 +46,7 @@ export function About() {
         </div>
       </Container>
 
-      <section className="border-y border-border bg-card py-14 sm:py-16">
+      <section className="border-y border-border bg-card py-14 sm:py-16" data-site-group="about.values">
         <Container className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <SectionHeading title={text("about.values.title")} className="reveal" />
           <dl className="grid gap-x-10 gap-y-7 sm:grid-cols-2">
