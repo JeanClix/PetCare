@@ -1335,7 +1335,7 @@ function AdminOverview({
   currentPurchases.forEach((purchase) => {
     purchase.items.forEach((item) => {
       const revenue = item.unitPrice * item.quantity;
-      productTotals.set(item.name, (productTotals.get(item.name) ?? 0) + revenue);
+      if (item.productId !== null) productTotals.set(item.name, (productTotals.get(item.name) ?? 0) + revenue);
       const category = item.productId !== null ? productCategoryById.get(item.productId) : undefined;
       const key = category ?? "servicios";
       categoryTotals.set(key, (categoryTotals.get(key) ?? 0) + revenue);
