@@ -205,7 +205,6 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
   const [contactNotesDraft, setContactNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
 
-  const socialOAuthState = new URLSearchParams(location.search).get("state") ?? "";
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("view") === "social") setActiveView("social");
@@ -394,7 +393,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
         )}
         {activeView === "availability" && <AvailabilityManager token={token} role={role} />}
         {activeView === "whatsapp" && <WhatsappSettings token={token} />}
-        {activeView === "social" && <SocialMediaManager token={token} oauthState={socialOAuthState} />}
+        {activeView === "social" && <SocialMediaManager token={token} />}
         {activeView === "patients" && <PatientsView token={token} selectedId={selectedPatientId} onSelect={setSelectedPatientId} />}
 
         {activeView === "accounts" && <AdminAccounts token={token} currentEmail={user.email} />}

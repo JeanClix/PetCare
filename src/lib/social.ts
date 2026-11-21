@@ -1,62 +1,54 @@
 import { adminRequest } from "@/lib/adminAuth";
 
-export type SocialPlatform = "facebook" | "instagram";
-
-export type SocialPage = {
+export type SocialChannel = {
   id: string;
   name: string;
-  instagramId: string | null;
-  instagramUsername: string | null;
+  platform: string;
+  picture: string | null;
+  disabled: boolean;
 };
+
+export type SocialPostState = "DRAFT" | "QUEUE" | "PUBLISHED" | "ERROR";
 
 export type SocialPost = {
   id: string;
-  platform: SocialPlatform;
-  caption: string;
-  mediaId: string;
-  providerId: string | null;
-  status: "published" | "failed";
-  error: string;
-  createdAt: string;
+  content: string;
+  state: SocialPostState;
+  publishDate: string | null;
+  error: string | null;
+  channel: { id: string; name: string; platform: string; picture: string | null } | null;
 };
 
-export type SocialMediaStatus = {
-  configured: boolean;
-  connected: boolean;
-  page: SocialPage | null;
-  pendingPages: SocialPage[];
-  history: SocialPost[];
-};
+export type SocialAttachment = { id: string; path: string };
 
 const adminApiUrl = (import.meta.env.VITE_ADMIN_API_URL as string | undefined)
   ?.trim()
   .replace(/\/+$/, "") || (import.meta.env.DEV ? "/api/admin" : "");
 
-export function socialMediaUrl(mediaId: string) {
-  return `${adminApiUrl}/social-media/${encodeURIComponent(mediaId)}`;
+export function getSocialChannels(token: string) {
+  return adminRequest<{ configured: boolean; channels: SocialChannel[] }>("/crm/social-channels", {}, token);
 }
 
-export function getSocialMediaStatus(token: string, state?: string) {
-  return adminRequest<SocialMediaStatus>(
-    "/crm/social-status",
-    state ? { state } : {},
-    token,
-  );
+export function getSocialPosts(token: string, range: { startDate: string; endDate: string }) {
+  return adminRequest<{ posts: SocialPost[] }>("/crm/social-posts-list", range, token);
 }
 
-export function startSocialConnection(token: string) {
-  return adminRequest<{ authorizationUrl: string }>("/crm/social-connect", {}, token);
+export function createSocialPost(
+  token: string,
+  input: { content: string; channelIds: string[]; type: "draft" | "schedule" | "now"; date?: string; attachments?: SocialAttachment[] },
+) {
+  return adminRequest<{ ok: true }>("/crm/social-post-create", input, token);
 }
 
-export function selectSocialPage(token: string, state: string, pageId: string) {
-  return adminRequest<{ ok: true }>("/crm/social-select", { state, pageId }, token);
+export function setSocialPostStatus(token: string, input: { id: string; status: "draft" | "schedule" }) {
+  return adminRequest<{ ok: true }>("/crm/social-post-status", input, token);
 }
 
-export function disconnectSocialAccounts(token: string) {
-  return adminRequest<{ ok: true }>("/crm/social-disconnect", {}, token);
+export function deleteSocialPost(token: string, input: { id: string }) {
+  return adminRequest<{ ok: true }>("/crm/social-post-delete", input, token);
 }
 
-export async function uploadSocialImage(token: string, image: File) {
+export async function uploadSocialAttachment(token: string, file: File): Promise<SocialAttachment> {
   if (!adminApiUrl) throw new Error("La función administrativa aún no está configurada.");
   let response: Response;
   try {
@@ -64,22 +56,15 @@ export async function uploadSocialImage(token: string, image: File) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": image.type,
+        "Content-Type": file.type,
       },
-      body: image,
+      body: file,
     });
   } catch {
     throw new Error("No se pudo conectar con el servicio administrativo.");
   }
-  const result = await response.json().catch(() => null) as { mediaId?: string; error?: string } | null;
-  if (!response.ok) throw new Error(result?.error ?? "No se pudo guardar la imagen.");
-  if (!result?.mediaId) throw new Error("El servicio devolvió una respuesta inválida.");
-  return result.mediaId;
-}
-
-export function publishSocialPost(
-  token: string,
-  input: { caption: string; mediaId: string; platforms: SocialPlatform[] },
-) {
-  return adminRequest<{ results: SocialPost[] }>("/crm/social-publish", input, token);
+  const result = await response.json().catch(() => null) as { id?: string; path?: string; error?: string } | null;
+  if (!response.ok) throw new Error(result?.error ?? "No se pudo subir el archivo.");
+  if (!result?.id || !result.path) throw new Error("El servicio devolvió una respuesta inválida.");
+  return { id: result.id, path: result.path };
 }

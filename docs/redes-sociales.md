@@ -1,42 +1,49 @@
-# Publicar en Facebook e Instagram
+# Redes sociales (Postiz)
 
-La sección **Marketing → Redes Sociales** del panel publica imágenes directamente desde PetCare mediante la API oficial de Meta. Solo el rol administrador puede conectar cuentas, publicar o consultar el historial. Cada red seleccionada genera un resultado independiente; los éxitos y errores quedan registrados en Neon.
+> Este documento reemplaza la integración directa con Meta descrita antes aquí. PetCare ya no se conecta directamente a la API de Meta: toda la publicación y programación en redes sociales pasa por **Postiz** (postiz.com, también autoalojable). El historial de la integración anterior queda en el control de versiones si se necesita consultar.
 
-## Requisitos de Meta
+La sección **Marketing → Redes Sociales** del panel administra publicaciones en los canales conectados en Postiz (Facebook, Instagram y otras plataformas que Postiz soporte). Solo los roles con permiso pueden ver canales, crear/programar/publicar/borrar publicaciones y subir archivos adjuntos. Todas las llamadas a Postiz las hace la función `admin` de Neon en el backend; el navegador nunca recibe ni envía la API key de Postiz.
 
-- Una página de Facebook de Gabus Vet.
-- Una cuenta profesional de Instagram (empresa o creador) vinculada a esa página.
-- Una app en [Meta for Developers](https://developers.facebook.com/) con inicio de sesión de Facebook habilitado.
-- La cuenta de Meta que autoriza la app debe tener permisos para administrar la página y la cuenta de Instagram.
+## Requisito previo
 
-En Meta, configura como URI OAuth de redireccionamiento válida la URL pública de la función admin seguida de `/social-callback`. Por ejemplo, si `VITE_ADMIN_API_URL` termina en `/admin`, el callback será `https://<dominio-de-la-funcion>/admin/social-callback`. Registra exactamente la misma URL en Meta; el protocolo, dominio y ruta deben coincidir.
+Necesitas una cuenta de Postiz (nube en postiz.com o tu propia instancia autoalojada) con al menos un canal conectado (por ejemplo la página de Facebook y la cuenta de Instagram de Gabus Vet). La conexión de canales a Postiz se hace desde el panel de Postiz mismo, no desde PetCare; PetCare solo lee los canales ya conectados y publica a través de ellos.
 
-La app solicita estos permisos: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` e `instagram_content_publish`. En modo desarrollo solo podrán autorizarla las personas con rol de la app; para uso del equipo fuera de esos roles, completa la revisión de permisos y publica la app en Meta. La aprobación depende de Meta y no puede completarse desde PetCare.
+Obtén tu API key desde la configuración de tu cuenta/organización en Postiz.
 
 ## Configuración en Neon
 
-Guarda estas variables como secretos de la función `admin` en Neon. No las agregues a `VITE_*`, `.env`, `.env.production` ni al código del navegador:
+Guarda estas variables como secretos de la función `admin` en Neon. No las agregues a `VITE_*`, `.env`, `.env.production` ni a ningún archivo que termine en el bundle del navegador:
 
-- `META_APP_ID`: identificador de la app.
-- `META_APP_SECRET`: secreto de la app.
-- `META_GRAPH_API_VERSION`: versión Graph API habilitada para la app, por ejemplo `v24.0`. Si se omite, se usa `v24.0`.
+- `POSTIZ_API_KEY` (**obligatoria**): tu API key de Postiz.
+- `POSTIZ_API_BASE_URL` (opcional): URL base de la API pública de Postiz. Si usas la nube de Postiz, omite esta variable (se usa `https://api.postiz.com/public/v1` por defecto). Si autoalojas Postiz, apunta aquí a la URL pública de tu instancia, por ejemplo `https://tu-dominio.com/public/v1`.
 
-Vuelve a desplegar la función admin conservando sus otras variables de entorno. La compilación se realiza con:
+Vuelve a desplegar la función admin conservando sus otras variables de entorno (`META_*` ya no se usan y pueden quedarse o eliminarse sin efecto; `GROQ_API_KEY`, las de WhatsApp, etc. deben mantenerse). La compilación y despliegue se realizan con:
 
 ```powershell
 npm run admin:build
-neon functions deploy admin --project-id <ID_DEL_PROYECTO_NEON> --branch main --src .neon-build/admin --no-bundle --env "META_APP_ID=$env:META_APP_ID" --env "META_APP_SECRET=$env:META_APP_SECRET" --env "META_GRAPH_API_VERSION=v24.0"
+neon functions deploy admin --project-id <ID_DEL_PROYECTO_NEON> --branch main --src .neon-build/admin --no-bundle --env "POSTIZ_API_KEY=$env:POSTIZ_API_KEY" --env "POSTIZ_API_BASE_URL=$env:POSTIZ_API_BASE_URL"
 ```
 
-Al conectar, Meta solicita autorización y PetCare permite elegir la página correcta entre las páginas accesibles a la cuenta. El token de página se cifra en el backend antes de guardarse en Neon. Las credenciales y los tokens no se envían al navegador.
-El botón **Desconectar** elimina de PetCare los tokens guardados; para revocar también el permiso concedido a la app, quítala desde la configuración de integraciones de Facebook.
+(Incluye además todas las demás variables `--env` que la función admin ya usa, para no perderlas en el despliegue.)
 
-## Publicaciones e imágenes
+Sin `POSTIZ_API_KEY` configurada, la sección de redes sociales del panel muestra un aviso de "integración no configurada" en lugar de datos.
 
-- Se pueden seleccionar Facebook, Instagram o ambas redes para una publicación.
-- La vista previa se muestra antes de confirmar **Publicar ahora**; la acción publica inmediatamente y no programa publicaciones futuras.
-- Cada intento genera su propio registro en el historial, con red, fecha, estado, texto y error de Meta si lo hubo.
-- Para cumplir el requisito de URL pública de la API de Instagram, las imágenes JPEG de hasta 5 MB se guardan en Neon y se sirven desde una ruta pública de la función admin. Las imágenes pueden ser descargadas por Meta y por quien tenga su URL; no subas contenido privado.
-- La publicación en Instagram requiere que la página seleccionada tenga una cuenta profesional vinculada. Si no aparece conectada, enlázala desde la configuración de cuentas de Meta y vuelve a conectar.
+## Qué hace cada parte del panel
 
-La migración `migrations/20261103_petcare_social_publishing.sql` documenta las tablas nuevas. La función también las crea idempotentemente al atender solicitudes; la conexión de Neon necesita permiso para crear tablas e índices.
+- **Resumen (Dashboard)**: canales conectados (leídos en vivo desde Postiz), conteo de publicaciones por estado (borrador, programada, publicada, error) y las próximas publicaciones programadas, dentro de la ventana de fechas del calendario.
+- **Composer**: redactar el texto, elegir uno o varios canales, adjuntar una imagen o video (se sube primero a Postiz y PetCare solo guarda la referencia), y elegir si la publicación queda como **borrador**, se **programa** para una fecha/hora, o se **publica de inmediato**. Postiz entrega el contenido a cada red seleccionada.
+- **Calendario editorial**: lista agrupada por día de las publicaciones dentro de una ventana navegable (anterior/hoy/siguiente), con su hora, canal, estado y el error de Postiz si lo hubo. Desde ahí se puede **aprobar** un borrador (lo pasa a programado) o **eliminar** una publicación.
+
+## Límites conocidos
+
+- Postiz no ofrece todavía un endpoint para cambiar solo la fecha de una publicación ya creada; "reprogramar" en el sentido estricto no está disponible desde el panel. Para cambiar la fecha, elimina la publicación y créala de nuevo con la nueva fecha.
+- Eliminar una publicación ya publicada la borra del historial de Postiz, pero no la retira de la red social si ya se publicó ahí.
+- La API pública de Postiz limita la creación de publicaciones a aproximadamente 90–100 por hora.
+
+## Fuera de alcance de esta fase
+
+El agente de IA que redacta contenido automáticamente, el asistente conversacional "Preguntar a la IA" y la generación/programación automática de calendarios de contenido **no** están implementados todavía. Toda publicación pasa por el Composer con revisión humana antes de programarse o publicarse.
+
+## Limpieza pendiente (opcional)
+
+Las tablas `petcare_social_connections`, `petcare_social_oauth_states`, `petcare_social_media` y `petcare_social_posts`, creadas por la integración directa con Meta anterior, ya no se usan y están vacías. Pueden eliminarse de la base de datos cuando quieras; el código ya no las crea ni las referencia.

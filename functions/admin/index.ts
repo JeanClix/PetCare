@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 const SESSION_LIFETIME_SECONDS = 60 * 60 * 2;
@@ -34,7 +34,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 // WhatsApp: todo el equipo escribe a clientes; solo el administrador enlaza o desvincula el número
 const WHATSAPP_SEND_ACTIONS = ["whatsapp-send", "whatsapp-history"];
 const SOCIAL_ADMIN_ACTIONS = [
-  "social-status", "social-connect", "social-select", "social-disconnect", "social-upload", "social-publish",
+  "social-channels", "social-posts-list", "social-post-create", "social-post-status", "social-post-delete", "social-upload",
 ];
 const SITE_ADMIN_ACTIONS = [
   "site-content", "site-image-upload",
@@ -188,61 +188,43 @@ function whatsappService() {
   return url && token ? { url, token } : null;
 }
 
-function metaConfig() {
-  const appId = process.env.META_APP_ID?.trim();
-  const appSecret = process.env.META_APP_SECRET?.trim();
-  const graphVersion = process.env.META_GRAPH_API_VERSION?.trim() || "v24.0";
-  if (!appId || !appSecret || !/^v\d+\.\d+$/.test(graphVersion)) return null;
-  return { appId, appSecret, graphVersion };
+function postizConfig() {
+  const apiKey = process.env.POSTIZ_API_KEY?.trim();
+  if (!apiKey) return null;
+  const baseUrl = (process.env.POSTIZ_API_BASE_URL?.trim() || "https://api.postiz.com/public/v1").replace(/\/+$/, "");
+  return { apiKey, baseUrl };
 }
 
-function encryptSocialToken(token: string, secret: string) {
-  const key = createHash("sha256").update(secret).digest();
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
-  return `${iv.toString("base64url")}.${cipher.getAuthTag().toString("base64url")}.${encrypted.toString("base64url")}`;
-}
-
-function decryptSocialToken(value: string, secret: string) {
-  const [ivText, tagText, encryptedText, extra] = value.split(".");
-  if (!ivText || !tagText || !encryptedText || extra) throw new Error("No se pudo descifrar la credencial de Meta.");
-  const key = createHash("sha256").update(secret).digest();
-  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivText, "base64url"));
-  decipher.setAuthTag(Buffer.from(tagText, "base64url"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(encryptedText, "base64url")),
-    decipher.final(),
-  ]).toString("utf8");
-}
-
-async function metaRequest<T>(
-  graphVersion: string,
+async function postizRequest<T>(
+  postiz: { apiKey: string; baseUrl: string },
   path: string,
-  params: Record<string, string>,
-  method: "GET" | "POST" = "GET",
+  options: { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown; query?: Record<string, string>; formData?: FormData } = {},
 ): Promise<T> {
-  const url = new URL(`https://graph.facebook.com/${graphVersion}/${path.replace(/^\/+/, "")}`);
-  const options: RequestInit = { method, signal: AbortSignal.timeout(30_000) };
-  if (method === "GET") {
-    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-  } else {
-    options.headers = { "Content-Type": "application/x-www-form-urlencoded" };
-    options.body = new URLSearchParams(params);
+  const target = new URL(`${postiz.baseUrl}${path.startsWith("/") ? path : `/${path}`}`);
+  if (options.query) for (const [key, value] of Object.entries(options.query)) target.searchParams.set(key, value);
+  const headers: Record<string, string> = { Authorization: postiz.apiKey };
+  let body: BodyInit | undefined;
+  if (options.formData) {
+    body = options.formData;
+  } else if (options.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(options.body);
   }
   let result: Response;
   try {
-    result = await fetch(url, options);
+    result = await fetch(target, { method: options.method ?? "GET", headers, body, signal: AbortSignal.timeout(30_000) });
   } catch {
-    throw new Error("No se pudo conectar con la API de Meta. Inténtalo nuevamente.");
+    throw new Error("No se pudo conectar con Postiz. Inténtalo nuevamente.");
   }
-  const data = await result.json().catch(() => null) as { error?: { message?: unknown } } | null;
+  const raw = await result.text();
+  const data = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
   if (!result.ok) {
-    const message = typeof data?.error?.message === "string" ? text(data.error.message, 500) : "";
-    throw new Error(message || `Meta rechazó la solicitud (${result.status}).`);
+    const message = data && typeof data === "object" && typeof (data as { message?: unknown }).message === "string"
+      ? text((data as { message: string }).message, 500)
+      : "";
+    throw new Error(message || `Postiz rechazó la solicitud (${result.status}).`);
   }
-  if (!data) throw new Error("Meta devolvió una respuesta inválida.");
-  return data as T;
+  return (data ?? {}) as T;
 }
 
 /** Llama al servicio de WhatsApp (Render); con body hace POST, sin body hace GET */
@@ -590,49 +572,6 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>) {
   await sql`CREATE INDEX IF NOT EXISTS petcare_clinical_records_pet_idx ON petcare_clinical_records (pet_id, visited_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS petcare_clinical_records_appointment_idx ON petcare_clinical_records (appointment_id)`;
   await sql`
-    CREATE TABLE IF NOT EXISTS petcare_social_connections (
-      id TEXT PRIMARY KEY,
-      facebook_page_id TEXT NOT NULL,
-      facebook_page_name TEXT NOT NULL,
-      instagram_account_id TEXT,
-      instagram_username TEXT NOT NULL DEFAULT '',
-      encrypted_page_access_token TEXT NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS petcare_social_oauth_states (
-      state_hash TEXT PRIMARY KEY,
-      admin_id TEXT NOT NULL,
-      encrypted_user_access_token TEXT,
-      pages JSONB NOT NULL DEFAULT '[]'::jsonb,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      expires_at TIMESTAMPTZ NOT NULL
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS petcare_social_media (
-      id UUID PRIMARY KEY,
-      mime_type TEXT NOT NULL CHECK (mime_type = 'image/jpeg'),
-      data_base64 TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS petcare_social_posts (
-      id UUID PRIMARY KEY,
-      platform TEXT NOT NULL CHECK (platform IN ('facebook', 'instagram')),
-      caption TEXT NOT NULL,
-      media_id UUID NOT NULL REFERENCES petcare_social_media(id),
-      provider_id TEXT,
-      status TEXT NOT NULL CHECK (status IN ('published', 'failed')),
-      error TEXT NOT NULL DEFAULT '',
-      created_by_id TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`CREATE INDEX IF NOT EXISTS petcare_social_posts_created_idx ON petcare_social_posts (created_at DESC)`;
-  await sql`
     CREATE TABLE IF NOT EXISTS petcare_site_content (
       id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
       content JSONB NOT NULL,
@@ -878,17 +817,13 @@ export default {
     const path = url.pathname.replace(/\/+$/, "");
     const route = path.split("/").filter(Boolean);
     const action = route.at(-1) ?? "";
-    const socialMediaId = route.at(-2) === "social-media" ? action : "";
     const siteImageId = route.at(-2) === "site-image" ? action : "";
-    const isPublicSocialMedia = UUID_PATTERN.test(socialMediaId);
     const isPublicSiteImage = UUID_PATTERN.test(siteImageId);
     if (
       origin &&
       !allowedOrigins.has(origin) &&
       action !== "unsubscribe" &&
       action !== "resend" &&
-      action !== "social-callback" &&
-      !isPublicSocialMedia &&
       !isPublicSiteImage
     ) {
       return response({ error: "Origen no permitido" }, 403, null);
@@ -930,103 +865,6 @@ export default {
         return response({ error: "No se pudo cargar el contenido del sitio." }, 503, origin);
       }
     }
-    if (isPublicSocialMedia && request.method === "GET") {
-      try {
-        await ensureSchema(sql);
-        const rows = await sql`
-          SELECT mime_type, data_base64 FROM petcare_social_media WHERE id = ${socialMediaId}::uuid LIMIT 1
-        `;
-        const row = rows[0];
-        if (!row) return new Response("No se encontró la imagen.", { status: 404 });
-        return new Response(new Uint8Array(Buffer.from(String(row.data_base64), "base64")), {
-          status: 200,
-          headers: {
-            "Content-Type": String(row.mime_type),
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-          },
-        });
-      } catch (error) {
-        console.error("No se pudo servir la imagen de una publicación", error);
-        return new Response("No se pudo recuperar la imagen.", { status: 503 });
-      }
-    }
-
-    if (action === "social-callback" && request.method === "GET") {
-      const redirect = (result: "connected" | "error", state?: string) => {
-        const destination = new URL("https://jeanclix.github.io/PetCare/");
-        destination.hash = `/admin?view=social&social=${result}${state ? `&state=${encodeURIComponent(state)}` : ""}`;
-        return new Response(null, {
-          status: 302,
-          headers: { Location: destination.toString(), "Cache-Control": "no-store" },
-        });
-      };
-      const state = url.searchParams.get("state") ?? "";
-      const code = url.searchParams.get("code") ?? "";
-      if (url.searchParams.has("error") || !state || state.length > 200 || !code || code.length > 4096) {
-        return redirect("error");
-      }
-      const meta = metaConfig();
-      if (!meta) return redirect("error");
-      const stateHash = createHash("sha256").update(state).digest("hex");
-      try {
-        await ensureSchema(sql);
-        const entries = await sql`
-          SELECT state_hash, expires_at FROM petcare_social_oauth_states
-          WHERE state_hash = ${stateHash} AND encrypted_user_access_token IS NULL
-          LIMIT 1
-        `;
-        if (!entries.length || Date.parse(String(entries[0].expires_at)) <= Date.now()) return redirect("error");
-        const redirectUri = `${url.origin}${path}`;
-        const shortToken = await metaRequest<{ access_token?: string }>(
-          meta.graphVersion,
-          "oauth/access_token",
-          { client_id: meta.appId, client_secret: meta.appSecret, redirect_uri: redirectUri, code },
-        );
-        if (!shortToken.access_token) throw new Error("Meta no devolvió un token de acceso.");
-        const longToken = await metaRequest<{ access_token?: string }>(
-          meta.graphVersion,
-          "oauth/access_token",
-          {
-            grant_type: "fb_exchange_token",
-            client_id: meta.appId,
-            client_secret: meta.appSecret,
-            fb_exchange_token: shortToken.access_token,
-          },
-        );
-        if (!longToken.access_token) throw new Error("Meta no devolvió un token de larga duración.");
-        const pageResult = await metaRequest<{
-          data?: Array<{
-            id?: unknown;
-            name?: unknown;
-            instagram_business_account?: { id?: unknown; username?: unknown } | null;
-          }>;
-        }>(meta.graphVersion, "me/accounts", {
-          fields: "id,name,instagram_business_account{id,username}",
-          limit: "100",
-          access_token: longToken.access_token,
-        });
-        const pages = (pageResult.data ?? []).flatMap((page) => {
-          const id = text(page.id, 100);
-          const name = text(page.name, 200);
-          const instagramId = text(page.instagram_business_account?.id, 100);
-          if (!id || !name) return [];
-          return [{ id, name, instagramId: instagramId || null, instagramUsername: text(page.instagram_business_account?.username, 100) || null }];
-        });
-        await sql`
-          UPDATE petcare_social_oauth_states
-          SET encrypted_user_access_token = ${encryptSocialToken(longToken.access_token, config.secret)},
-            pages = ${JSON.stringify(pages)}::jsonb
-          WHERE state_hash = ${stateHash}
-        `;
-        if (!pages.length) return redirect("error");
-        return redirect("connected", state);
-      } catch (error) {
-        console.error("No se pudo completar OAuth de Meta", error);
-        return redirect("error");
-      }
-    }
-
     if (action === "unsubscribe" && request.method === "GET") {
       const email = (url.searchParams.get("email") ?? "").trim().toLowerCase();
       const token = url.searchParams.get("token") ?? "";
@@ -1537,20 +1375,27 @@ export default {
         return response({ url: `${url.origin}${imagePath}` }, 201, origin);
       }
       if (action === "social-upload") {
-        if (request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !== "image/jpeg") {
-          return response({ error: "Solo se aceptan imágenes JPEG." }, 415, origin);
+        const postiz = postizConfig();
+        if (!postiz) return response({ error: "Postiz aún no está configurado en Neon." }, 503, origin);
+        const mimeType = request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() ?? "";
+        const extensionByMime: Record<string, string> = {
+          "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "video/quicktime": "mov",
+        };
+        const extension = extensionByMime[mimeType];
+        if (!extension) return response({ error: "Usa una imagen JPG, PNG o WebP, o un video MP4 o MOV." }, 415, origin);
+        const file = await readBoundedBody(request, 15 * 1024 * 1024);
+        if (!file?.byteLength) return response({ error: "El archivo debe pesar 15 MB o menos." }, 413, origin);
+        const formData = new FormData();
+        formData.append("file", new Blob([file], { type: mimeType }), `petcare-${Date.now()}.${extension}`);
+        try {
+          const uploaded = await postizRequest<{ id?: unknown; path?: unknown; status?: unknown }>(postiz, "/upload", { method: "POST", formData });
+          const mediaId = text(uploaded.id, 200);
+          const mediaPath = text(uploaded.path, 2000);
+          if (!mediaId || !mediaPath) throw new Error("Postiz no devolvió el archivo subido.");
+          return response({ id: mediaId, path: mediaPath }, 201, origin);
+        } catch (error) {
+          return response({ error: error instanceof Error ? error.message : "No se pudo subir el archivo a Postiz." }, 502, origin);
         }
-        const image = await readBoundedBody(request, 5 * 1024 * 1024);
-        if (!image?.byteLength) return response({ error: "La imagen debe pesar 5 MB o menos." }, 413, origin);
-        if (image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff) {
-          return response({ error: "El archivo no es una imagen JPEG válida." }, 415, origin);
-        }
-        const mediaId = crypto.randomUUID();
-        await sql`
-          INSERT INTO petcare_social_media (id, mime_type, data_base64)
-          VALUES (${mediaId}::uuid, 'image/jpeg', ${Buffer.from(image).toString("base64")})
-        `;
-        return response({ mediaId }, 201, origin);
       }
 
       const body = await parseJsonBody(request, SITE_LARGE_BODY_ACTIONS.has(action) ? 1024 * 1024 : undefined);
@@ -1813,242 +1658,119 @@ export default {
         }
         return response({ ok: true }, 200, origin);
       }
-      if (action === "social-status") {
-        const state = text(body?.state, 200);
-        const stateHash = state ? createHash("sha256").update(state).digest("hex") : "";
-        await sql`DELETE FROM petcare_social_oauth_states WHERE expires_at <= now()`;
-        const [connections, pending, history] = await Promise.all([
-          sql`
-            SELECT facebook_page_id AS "facebookPageId", facebook_page_name AS "facebookPageName",
-              instagram_account_id AS "instagramAccountId", instagram_username AS "instagramUsername"
-            FROM petcare_social_connections WHERE id = 'gabus-vet' LIMIT 1
-          `,
-          stateHash
-            ? sql`
-                SELECT pages FROM petcare_social_oauth_states
-                WHERE state_hash = ${stateHash} AND admin_id = ${activeSession.id}
-                  AND encrypted_user_access_token IS NOT NULL AND expires_at > now()
-                LIMIT 1
-              `
-            : Promise.resolve([]),
-          sql`
-            SELECT id, platform, caption, media_id AS "mediaId", provider_id AS "providerId",
-              status, error, created_at AS "createdAt"
-            FROM petcare_social_posts ORDER BY created_at DESC LIMIT 30
-          `,
-        ]);
-        const connection = connections[0];
-        const pages = Array.isArray(pending[0]?.pages) ? pending[0].pages : [];
-        return response({
-          configured: Boolean(metaConfig()),
-          connected: Boolean(connection),
-          page: connection
-            ? {
-                id: String(connection.facebookPageId),
-                name: String(connection.facebookPageName),
-                instagramId: connection.instagramAccountId ? String(connection.instagramAccountId) : null,
-                instagramUsername: String(connection.instagramUsername ?? "") || null,
-              }
-            : null,
-          pendingPages: pages,
-          history: history.map((entry) => ({
-            ...entry,
-            id: String(entry.id),
-            mediaId: String(entry.mediaId),
-            platform: String(entry.platform),
-            status: String(entry.status),
-            createdAt: new Date(String(entry.createdAt)).toISOString(),
-          })),
-        }, 200, origin);
-      }
-      if (action === "social-connect") {
-        const meta = metaConfig();
-        if (!meta) return response({ error: "La integración con Meta aún no está configurada en Neon." }, 503, origin);
-        const state = randomBytes(32).toString("base64url");
-        const stateHash = createHash("sha256").update(state).digest("hex");
-        const callbackPath = path.replace(/\/crm\/social-connect$/, "/social-callback");
-        if (callbackPath === path) return response({ error: "No se pudo determinar la URL de retorno de Meta." }, 500, origin);
-        const redirectUri = `${url.origin}${callbackPath}`;
-        await sql`DELETE FROM petcare_social_oauth_states WHERE expires_at <= now()`;
-        await sql`
-          INSERT INTO petcare_social_oauth_states (state_hash, admin_id, expires_at)
-          VALUES (${stateHash}, ${activeSession.id}, now() + interval '10 minutes')
-        `;
-        const authorization = new URL(`https://www.facebook.com/${meta.graphVersion}/dialog/oauth`);
-        authorization.searchParams.set("client_id", meta.appId);
-        authorization.searchParams.set("redirect_uri", redirectUri);
-        authorization.searchParams.set("state", state);
-        authorization.searchParams.set("response_type", "code");
-        authorization.searchParams.set(
-          "scope",
-          "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
-        );
-        return response({ authorizationUrl: authorization.toString() }, 200, origin);
-      }
-      if (action === "social-select") {
-        const state = text(body?.state, 200);
-        const pageId = text(body?.pageId, 100);
-        if (!state || !pageId) return response({ error: "Elige la página de Facebook que deseas conectar." }, 400, origin);
-        const stateHash = createHash("sha256").update(state).digest("hex");
-        const pending = await sql`
-          SELECT encrypted_user_access_token AS "encryptedUserAccessToken"
-          FROM petcare_social_oauth_states
-          WHERE state_hash = ${stateHash} AND admin_id = ${activeSession.id}
-            AND encrypted_user_access_token IS NOT NULL AND expires_at > now()
-          LIMIT 1
-        `;
-        if (!pending.length) return response({ error: "La autorización de Meta venció. Vuelve a conectar la cuenta." }, 410, origin);
-        const meta = metaConfig();
-        if (!meta) return response({ error: "La integración con Meta aún no está configurada." }, 503, origin);
-        const userAccessToken = decryptSocialToken(String(pending[0].encryptedUserAccessToken), config.secret);
-        const pageResult = await metaRequest<{
-          data?: Array<{
-            id?: unknown;
-            name?: unknown;
-            access_token?: unknown;
-            instagram_business_account?: { id?: unknown; username?: unknown } | null;
-          }>;
-        }>(meta.graphVersion, "me/accounts", {
-          fields: "id,name,access_token,instagram_business_account{id,username}",
-          limit: "100",
-          access_token: userAccessToken,
-        });
-        const page = (pageResult.data ?? []).find((entry) => String(entry.id ?? "") === pageId);
-        const pageAccessToken = typeof page?.access_token === "string" ? page.access_token : "";
-        if (!page || !pageAccessToken) {
-          return response({ error: "Meta no devolvió acceso para esa página. Revisa los permisos concedidos." }, 403, origin);
+      if (action === "social-channels") {
+        const postiz = postizConfig();
+        if (!postiz) return response({ configured: false, channels: [] }, 200, origin);
+        try {
+          const integrations = await postizRequest<Array<Record<string, unknown>>>(postiz, "/integrations");
+          const channels = (Array.isArray(integrations) ? integrations : []).map((entry) => ({
+            id: text(entry.id, 200),
+            name: text(entry.name, 200) || "Canal sin nombre",
+            platform: text(entry.identifier ?? entry.providerIdentifier, 100),
+            picture: text(entry.picture, 2000) || null,
+            disabled: Boolean(entry.disabled),
+          })).filter((channel) => channel.id);
+          return response({ configured: true, channels }, 200, origin);
+        } catch (error) {
+          return response({ error: error instanceof Error ? error.message : "No se pudo consultar Postiz." }, 502, origin);
         }
-        await sql`
-          INSERT INTO petcare_social_connections (
-            id, facebook_page_id, facebook_page_name, instagram_account_id, instagram_username,
-            encrypted_page_access_token, updated_at
-          ) VALUES (
-            'gabus-vet', ${pageId}, ${text(page.name, 200)},
-            ${text(page.instagram_business_account?.id, 100) || null},
-            ${text(page.instagram_business_account?.username, 100)},
-            ${encryptSocialToken(pageAccessToken, config.secret)}, now()
-          )
-          ON CONFLICT (id) DO UPDATE SET
-            facebook_page_id = EXCLUDED.facebook_page_id,
-            facebook_page_name = EXCLUDED.facebook_page_name,
-            instagram_account_id = EXCLUDED.instagram_account_id,
-            instagram_username = EXCLUDED.instagram_username,
-            encrypted_page_access_token = EXCLUDED.encrypted_page_access_token,
-            updated_at = now()
-        `;
-        await sql`DELETE FROM petcare_social_oauth_states WHERE state_hash = ${stateHash}`;
-        return response({ ok: true }, 200, origin);
       }
-      if (action === "social-disconnect") {
-        await sql`DELETE FROM petcare_social_connections WHERE id = 'gabus-vet'`;
-        await sql`DELETE FROM petcare_social_oauth_states WHERE admin_id = ${activeSession.id}`;
-        return response({ ok: true }, 200, origin);
-      }
-      if (action === "social-publish") {
-        const caption = text(body?.caption, 2200);
-        const mediaId = text(body?.mediaId, 36);
-        const requestedPlatforms = Array.isArray(body?.platforms) ? body.platforms : [];
-        const platforms = [...new Set(requestedPlatforms.filter(
-          (platform): platform is "facebook" | "instagram" => platform === "facebook" || platform === "instagram",
-        ))];
-        if (!caption || !UUID_PATTERN.test(mediaId) || !platforms.length || platforms.length !== requestedPlatforms.length) {
-          return response({ error: "Escribe el texto, adjunta una imagen JPEG y selecciona al menos una red." }, 400, origin);
+      if (action === "social-posts-list") {
+        const postiz = postizConfig();
+        if (!postiz) return response({ error: "Postiz aún no está configurado en Neon." }, 503, origin);
+        const startDate = text(body?.startDate, 40);
+        const endDate = text(body?.endDate, 40);
+        if (!startDate || !endDate || Number.isNaN(Date.parse(startDate)) || Number.isNaN(Date.parse(endDate))) {
+          return response({ error: "Indica un rango de fechas válido." }, 400, origin);
         }
-        const [connections, mediaRows] = await Promise.all([
-          sql`
-            SELECT facebook_page_id AS "facebookPageId", instagram_account_id AS "instagramAccountId",
-              encrypted_page_access_token AS "encryptedPageAccessToken"
-            FROM petcare_social_connections WHERE id = 'gabus-vet' LIMIT 1
-          `,
-          sql`SELECT id FROM petcare_social_media WHERE id = ${mediaId}::uuid LIMIT 1`,
-        ]);
-        if (!connections.length) return response({ error: "Conecta primero la página de Facebook de Gabus Vet." }, 409, origin);
-        if (!mediaRows.length) return response({ error: "La imagen no está disponible. Adjunta otra vez el archivo." }, 404, origin);
-        const connection = connections[0];
-        const meta = metaConfig();
-        if (!meta) return response({ error: "La integración con Meta aún no está configurada." }, 503, origin);
-        const pageAccessToken = decryptSocialToken(String(connection.encryptedPageAccessToken), config.secret);
-        const imageUrl = `${url.origin}${path.replace(/\/crm\/social-publish$/, `/social-media/${mediaId}`)}`;
-        const results: Array<{
-          id: string;
-          platform: "facebook" | "instagram";
-          caption: string;
-          mediaId: string;
-          providerId: string | null;
-          status: "published" | "failed";
-          error: string;
-          createdAt: string;
-        }> = [];
-        for (const platform of platforms) {
-          let providerId: string | null = null;
-          let failure = "";
-          try {
-            if (platform === "facebook") {
-              const published = await metaRequest<{ id?: unknown; post_id?: unknown }>(
-                meta.graphVersion,
-                `${connection.facebookPageId}/photos`,
-                { url: imageUrl, caption, access_token: pageAccessToken },
-                "POST",
-              );
-              providerId = text(published.post_id ?? published.id, 200) || null;
-              if (!providerId) throw new Error("Meta no devolvió el identificador de la publicación de Facebook.");
-            } else {
-              const instagramId = String(connection.instagramAccountId ?? "");
-              if (!instagramId) throw new Error("Conecta una cuenta profesional de Instagram a la página de Facebook.");
-              const media = await metaRequest<{ id?: unknown }>(
-                meta.graphVersion,
-                `${instagramId}/media`,
-                { image_url: imageUrl, caption, access_token: pageAccessToken },
-                "POST",
-              );
-              const creationId = text(media.id, 200);
-              if (!creationId) throw new Error("Meta no devolvió el contenedor de Instagram.");
-              for (let attempt = 0; attempt < 8; attempt += 1) {
-                const container = await metaRequest<{ status_code?: unknown }>(
-                  meta.graphVersion,
-                  creationId,
-                  { fields: "status_code", access_token: pageAccessToken },
-                );
-                const status = String(container.status_code ?? "");
-                if (!status || status === "FINISHED") break;
-                if (status === "ERROR" || status === "EXPIRED") throw new Error("Instagram no pudo procesar la imagen.");
-                if (attempt === 7) throw new Error("Instagram todavía está procesando la imagen. Inténtalo nuevamente.");
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-              }
-              const published = await metaRequest<{ id?: unknown }>(
-                meta.graphVersion,
-                `${instagramId}/media_publish`,
-                { creation_id: creationId, access_token: pageAccessToken },
-                "POST",
-              );
-              providerId = text(published.id, 200) || null;
-              if (!providerId) throw new Error("Meta no devolvió el identificador de la publicación de Instagram.");
-            }
-          } catch (error) {
-            failure = error instanceof Error ? text(error.message, 500) : "No se pudo publicar en Meta.";
-          }
-          const id = crypto.randomUUID();
-          const status = failure ? "failed" : "published";
-          const inserted = await sql`
-            INSERT INTO petcare_social_posts (
-              id, platform, caption, media_id, provider_id, status, error, created_by_id
-            ) VALUES (
-              ${id}::uuid, ${platform}, ${caption}, ${mediaId}::uuid, ${providerId}, ${status}, ${failure}, ${activeSession.id}
-            )
-            RETURNING created_at AS "createdAt"
-          `;
-          results.push({
-            id,
-            platform,
-            caption,
-            mediaId,
-            providerId,
-            status,
-            error: failure,
-            createdAt: new Date(String(inserted[0].createdAt)).toISOString(),
+        try {
+          const result = await postizRequest<{ posts?: Array<Record<string, unknown>> }>(postiz, "/posts", {
+            query: { startDate, endDate },
           });
+          const posts = (result.posts ?? []).map((entry) => {
+            const integration = entry.integration as Record<string, unknown> | undefined;
+            return {
+              id: text(entry.id, 200),
+              content: text(entry.content, 5000),
+              state: text(entry.state, 40) || "DRAFT",
+              publishDate: text(entry.publishDate, 40) || null,
+              error: text(entry.error, 1000) || null,
+              channel: integration
+                ? { id: text(integration.id, 200), name: text(integration.name, 200), platform: text(integration.providerIdentifier, 100), picture: text(integration.picture, 2000) || null }
+                : null,
+            };
+          }).filter((post) => post.id);
+          return response({ posts }, 200, origin);
+        } catch (error) {
+          return response({ error: error instanceof Error ? error.message : "No se pudo consultar las publicaciones de Postiz." }, 502, origin);
         }
-        return response({ results }, 200, origin);
+      }
+      if (action === "social-post-create") {
+        const postiz = postizConfig();
+        if (!postiz) return response({ error: "Postiz aún no está configurado en Neon." }, 503, origin);
+        const content = text(body?.content, 2200);
+        const type = body?.type === "draft" || body?.type === "schedule" || body?.type === "now" ? body.type : "";
+        const channelIds = Array.isArray(body?.channelIds)
+          ? [...new Set(body.channelIds.filter((value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 200))]
+          : [];
+        const attachments = Array.isArray(body?.attachments)
+          ? body.attachments.slice(0, 10).flatMap((entry: unknown) => {
+              const id = text((entry as Record<string, unknown> | null)?.id, 200);
+              const mediaPath = text((entry as Record<string, unknown> | null)?.path, 2000);
+              return id && mediaPath ? [{ id, path: mediaPath }] : [];
+            })
+          : [];
+        if (!content || !type || !channelIds.length) {
+          return response({ error: "Escribe el contenido, elige al menos un canal y el tipo de publicación." }, 400, origin);
+        }
+        const date = type === "now" ? new Date().toISOString() : text(body?.date, 40);
+        if (type !== "draft" && (!date || Number.isNaN(Date.parse(date)))) {
+          return response({ error: "Indica una fecha y hora válidas para programar la publicación." }, 400, origin);
+        }
+        const htmlContent = content.split(/\r?\n+/).filter((line) => line.length > 0).map((line) => `<p>${escapeHtml(line)}</p>`).join("") || `<p>${escapeHtml(content)}</p>`;
+        try {
+          const created = await postizRequest<unknown>(postiz, "/posts", {
+            method: "POST",
+            body: {
+              type,
+              date: date || new Date().toISOString(),
+              shortLink: false,
+              tags: [],
+              posts: channelIds.map((integrationId) => ({
+                integration: { id: integrationId },
+                value: [{ content: htmlContent, image: attachments }],
+              })),
+            },
+          });
+          return response({ ok: true, result: created }, 201, origin);
+        } catch (error) {
+          return response({ error: error instanceof Error ? error.message : "No se pudo crear la publicación en Postiz." }, 502, origin);
+        }
+      }
+      if (action === "social-post-status") {
+        const postiz = postizConfig();
+        if (!postiz) return response({ error: "Postiz aún no está configurado en Neon." }, 503, origin);
+        const id = text(body?.id, 200);
+        const status = body?.status === "draft" || body?.status === "schedule" ? body.status : "";
+        if (!id || !status) return response({ error: "Indica la publicación y el nuevo estado." }, 400, origin);
+        try {
+          await postizRequest(postiz, `/posts/${encodeURIComponent(id)}/status`, { method: "PUT", body: { status } });
+          return response({ ok: true }, 200, origin);
+        } catch (error) {
+          return response({ error: error instanceof Error ? error.message : "No se pudo actualizar la publicación en Postiz." }, 502, origin);
+        }
+      }
+      if (action === "social-post-delete") {
+        const postiz = postizConfig();
+        if (!postiz) return response({ error: "Postiz aún no está configurado en Neon." }, 503, origin);
+        const id = text(body?.id, 200);
+        if (!id) return response({ error: "Indica la publicación a eliminar." }, 400, origin);
+        try {
+          await postizRequest(postiz, `/posts/${encodeURIComponent(id)}`, { method: "DELETE" });
+          return response({ ok: true }, 200, origin);
+        } catch (error) {
+          return response({ error: error instanceof Error ? error.message : "No se pudo eliminar la publicación en Postiz." }, 502, origin);
+        }
       }
       if (action === "accounts") {
         const rows = await sql`
