@@ -221,7 +221,9 @@ async function postizRequest<T>(
   if (!result.ok) {
     const message = data && typeof data === "object" && typeof (data as { message?: unknown }).message === "string"
       ? text((data as { message: string }).message, 500)
-      : "";
+      : Array.isArray((data as { message?: unknown })?.message)
+        ? ((data as { message: unknown[] }).message.map((entry) => String(entry)).join("; "))
+        : "";
     throw new Error(message || `Postiz rechazó la solicitud (${result.status}).`);
   }
   return (data ?? {}) as T;
