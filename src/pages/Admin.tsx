@@ -10,9 +10,12 @@ import {
   FirstAidKit,
   Gauge,
   Lightbulb,
+  Minus,
   PaintBrush,
   Receipt,
   ShareNetwork,
+  TrendDown,
+  TrendUp,
   UserGear,
   Users,
   WhatsappLogo,
@@ -36,6 +39,8 @@ import { PurchaseRegister } from "@/components/staff/PurchaseRegister";
 import type { WhatsappContext } from "@/lib/whatsapp";
 import {
   clearCrmData,
+  getAppointments,
+  getAppointmentSlots,
   getLegacyCrmMigrationCount,
   getCrmData,
   migrateLegacyCrm,
@@ -45,6 +50,8 @@ import {
   setContactNotes,
   setCrmLeadStatus,
   setMessageStatus,
+  type Appointment,
+  type AppointmentSlot,
   type ContactLifecycle,
   type ContactMessage,
   type ContactRecord,
@@ -55,6 +62,23 @@ import {
   type CrmData,
   type CustomerPurchase,
 } from "@/lib/crm";
+import { products as catalogProducts, categoryLabels as productCategoryLabels, type Category as ProductCategory } from "@/data/products";
+
+const productCategoryById = new Map<number, ProductCategory>(catalogProducts.map((product) => [product.id, product.category]));
+
+function formatCurrency(value: number) {
+  return `S/ ${value.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function percentChange(current: number, previous: number): { label: string; direction: "up" | "down" | "flat" } {
+  if (previous > 0) {
+    const pct = ((current - previous) / previous) * 100;
+    const rounded = Math.round(pct * 10) / 10;
+    return { label: `${rounded > 0 ? "+" : ""}${rounded}%`, direction: rounded > 0 ? "up" : rounded < 0 ? "down" : "flat" };
+  }
+  if (current > 0) return { label: "Sin base anterior", direction: "up" };
+  return { label: "Sin actividad", direction: "flat" };
+}
 
 const statusLabels: Record<CrmLeadStatus, string> = {
   new: "Nuevo",
@@ -144,6 +168,8 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
   const isAdmin = role === "admin";
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [purchases, setPurchases] = useState<CustomerPurchase[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointmentSlots, setAppointmentSlots] = useState<AppointmentSlot[]>([]);
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [marketing, setMarketing] = useState<CrmData["marketing"]>({
@@ -190,9 +216,15 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
     if (showLoading) setLoading(true);
     setCrmError("");
     try {
-      const data = await getCrmData(token);
+      const [data, appointmentList, slotList] = await Promise.all([
+        getCrmData(token),
+        getAppointments(token),
+        getAppointmentSlots(token),
+      ]);
       setLeads(data.leads);
       setPurchases(data.purchases);
+      setAppointments(appointmentList);
+      setAppointmentSlots(slotList);
       setContacts(data.contacts);
       setMessages(data.messages);
       setMarketing(data.marketing);
@@ -337,7 +369,14 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
           loading ? (
             <div role="status" className="rounded-media border border-border bg-card px-6 py-16 text-center text-muted-foreground shadow-soft">Cargando métricas del CRM...</div>
           ) : (
-            <AdminOverview leads={leads} contacts={contacts} messages={messages} />
+            <AdminOverview
+              leads={leads}
+              contacts={contacts}
+              messages={messages}
+              purchases={purchases}
+              appointments={appointments}
+              appointmentSlots={appointmentSlots}
+            />
           )
         )}
 
@@ -992,108 +1031,505 @@ function rangeDescription(bounds: DateBounds | null) {
   return `${bounds.start.toLocaleDateString("es-PE")} – ${addDays(bounds.end, -1).toLocaleDateString("es-PE")}`;
 }
 
+function bucketRanges(range: DateBounds | null) {
+  if (!range) return [] as { label: string; start: Date; end: Date }[];
+  const dayCount = Math.max(1, Math.round((range.end.getTime() - range.start.getTime()) / 86_400_000));
+  const bucketDays = Math.max(1, Math.ceil(dayCount / 14));
+  return Array.from({ length: Math.ceil(dayCount / bucketDays) }, (_, index) => {
+    const start = addDays(range.start, index * bucketDays);
+    const end = new Date(Math.min(addDays(start, bucketDays).getTime(), range.end.getTime()));
+    const label = start.toLocaleDateString("es-PE", { day: "2-digit", month: "short" });
+    return { label, start, end };
+  });
+}
+
+function KpiCard({
+  label,
+  value,
+  change,
+  description,
+}: {
+  label: string;
+  value: string | number;
+  change?: { label: string; direction: "up" | "down" | "flat" } | null;
+  description: string;
+}) {
+  const trendTone = !change ? "" : change.direction === "up" ? "text-accent" : change.direction === "down" ? "text-danger" : "text-muted-foreground";
+  return (
+    <div className="rounded-media border border-border bg-card p-5 shadow-soft">
+      <p className="text-sm font-semibold text-muted-foreground">{label}</p>
+      <p className="mt-2 font-display text-3xl font-black text-primary">{value}</p>
+      {change && (
+        <p className={cn("mt-1 flex items-center gap-1 text-xs font-bold", trendTone)}>
+          {change.direction === "up" ? <TrendUp weight="bold" /> : change.direction === "down" ? <TrendDown weight="bold" /> : <Minus weight="bold" />}
+          {change.label} vs. periodo anterior
+        </p>
+      )}
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function MiniLineChart({
+  buckets,
+  ariaLabel,
+  valueFormatter,
+}: {
+  buckets: { label: string; value: number }[];
+  ariaLabel: string;
+  valueFormatter?: (value: number) => string;
+}) {
+  if (buckets.length === 0 || buckets.every((bucket) => bucket.value === 0)) {
+    return <EmptyState title="Sin datos en este periodo" description="Cuando haya registros en el rango seleccionado, la evolución aparecerá aquí." />;
+  }
+  const max = Math.max(1, ...buckets.map((bucket) => bucket.value));
+  const points = buckets.map((bucket, index) => {
+    const x = buckets.length < 2 ? 320 : 24 + index * (612 / (buckets.length - 1));
+    const y = 172 - (bucket.value / max) * 142;
+    return { x, y, ...bucket };
+  });
+  const path = points.map(({ x, y }, index) => `${index ? "L" : "M"}${x},${y}`).join(" ");
+  const format = valueFormatter ?? ((value: number) => String(value));
+  return (
+    <div>
+      <svg role="img" aria-label={ariaLabel} viewBox="0 0 660 210" className="h-56 w-full overflow-visible">
+        <title>{ariaLabel}</title>
+        {[30, 75, 120, 172].map((y) => <line key={y} x1="20" y1={y} x2="640" y2={y} stroke="var(--color-border)" strokeDasharray="4 5" />)}
+        <path d={`${path} L${points.at(-1)?.x ?? 24},172 L${points[0]?.x ?? 24},172 Z`} fill="var(--color-accent)" opacity="0.11" />
+        <path d={path} fill="none" stroke="var(--color-accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((point, index) => (
+          <circle key={`${point.label}-${index}`} cx={point.x} cy={point.y} r="4" fill="var(--color-accent)" stroke="var(--color-card)" strokeWidth="2">
+            <title>{point.label}: {format(point.value)}</title>
+          </circle>
+        ))}
+      </svg>
+      <div className="flex justify-between px-1 text-xs text-muted-foreground">
+        <span>{buckets[0]?.label}</span>
+        {buckets.length > 2 && <span>{buckets[Math.floor(buckets.length / 2)]?.label}</span>}
+        <span>{buckets.at(-1)?.label}</span>
+      </div>
+    </div>
+  );
+}
+
+function VerticalBars({
+  bars,
+  ariaLabel,
+  tone = "bg-brand-navy",
+}: {
+  bars: { label: string; value: number }[];
+  ariaLabel: string;
+  tone?: string;
+}) {
+  const max = Math.max(1, ...bars.map((bar) => bar.value));
+  return (
+    <div role="img" aria-label={ariaLabel} className="flex min-h-56 items-end gap-1.5 overflow-x-auto border-b border-border px-1">
+      {bars.map((bar, index) => (
+        <div key={`${bar.label}-${index}`} title={`${bar.label}: ${bar.value}`} className="flex h-52 min-w-9 flex-1 flex-col items-center justify-end gap-2">
+          <span className="text-xs font-bold text-muted-foreground">{bar.value || ""}</span>
+          <div className={cn("w-full max-w-9 rounded-t-lg transition-[height]", tone)} style={{ height: `${Math.max(bar.value ? 8 : 2, (bar.value / max) * 100)}%` }} />
+          <span className="whitespace-nowrap text-[0.65rem] text-muted-foreground">{bar.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StackedBars({ buckets, ariaLabel }: { buckets: { label: string; a: number; b: number }[]; ariaLabel: string }) {
+  if (buckets.length === 0 || buckets.every((bucket) => bucket.a + bucket.b === 0)) {
+    return <EmptyState title="Sin datos en este periodo" description="La evolución de clientes nuevos y recurrentes aparecerá aquí." />;
+  }
+  const max = Math.max(1, ...buckets.map((bucket) => bucket.a + bucket.b));
+  return (
+    <div role="img" aria-label={ariaLabel} className="flex min-h-56 items-end gap-1.5 overflow-x-auto border-b border-border px-1">
+      {buckets.map((bucket, index) => {
+        const total = bucket.a + bucket.b;
+        return (
+          <div key={`${bucket.label}-${index}`} title={`${bucket.label}: ${bucket.a} nuevos, ${bucket.b} recurrentes`} className="flex h-52 min-w-9 flex-1 flex-col items-center justify-end gap-2">
+            <span className="text-xs font-bold text-muted-foreground">{total || ""}</span>
+            <div className="flex w-full max-w-9 flex-col-reverse overflow-hidden rounded-t-lg" style={{ height: `${Math.max(total ? 8 : 2, (total / max) * 100)}%` }}>
+              <div className="w-full bg-brand-navy" style={{ height: `${total ? (bucket.a / total) * 100 : 0}%` }} />
+              <div className="w-full bg-accent" style={{ height: `${total ? (bucket.b / total) * 100 : 0}%` }} />
+            </div>
+            <span className="whitespace-nowrap text-[0.65rem] text-muted-foreground">{bucket.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MiniBarList({ items, valueFormatter, emptyLabel }: { items: { label: string; value: number }[]; valueFormatter?: (value: number) => string; emptyLabel: string }) {
+  if (items.length === 0) return <EmptyState title="Sin datos" description={emptyLabel} />;
+  const max = Math.max(1, ...items.map((item) => item.value));
+  const format = valueFormatter ?? ((value: number) => String(value));
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div key={item.label}>
+          <div className="mb-1.5 flex justify-between gap-3 text-sm"><span className="truncate" title={item.label}>{item.label}</span><strong className="shrink-0 tabular-nums">{format(item.value)}</strong></div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-accent" style={{ width: `${(item.value / max) * 100}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConversionFunnel({ stages }: { stages: { label: string; value: number }[] }) {
+  const max = Math.max(1, ...stages.map((stage) => stage.value));
+  return (
+    <div className="space-y-3">
+      {stages.map((stage) => (
+        <div key={stage.label}>
+          <div className="mb-1.5 flex justify-between text-sm"><span>{stage.label}</span><strong className="tabular-nums">{stage.value}</strong></div>
+          <div className="h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-brand-navy" style={{ width: `${Math.max(stage.value ? 6 : 1, (stage.value / max) * 100)}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const categoryPalette: Record<string, { css: string; dot: string; label: string }> = {
+  alimento: { css: "var(--color-accent)", dot: "bg-accent", label: productCategoryLabels.alimento },
+  farmacia: { css: "var(--color-brand-navy)", dot: "bg-brand-navy", label: productCategoryLabels.farmacia },
+  higiene: { css: "#f59e0b", dot: "bg-amber-500", label: productCategoryLabels.higiene },
+  accesorio: { css: "#7c3aed", dot: "bg-violet-500", label: productCategoryLabels.accesorio },
+  servicios: { css: "var(--color-muted-foreground)", dot: "bg-muted-foreground", label: "Servicios veterinarios" },
+};
+
+function CategoryDonut({ segments, centerLabel, centerValue }: { segments: { key: string; value: number }[]; centerLabel: string; centerValue: string }) {
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  if (total <= 0) return <EmptyState title="Sin ingresos en este periodo" description="La distribución por categoría aparecerá cuando existan ventas registradas." />;
+  let cursor = 0;
+  const stops: string[] = [];
+  const ordered = [...segments].sort((a, b) => b.value - a.value);
+  ordered.forEach((segment) => {
+    const share = (segment.value / total) * 100;
+    const palette = categoryPalette[segment.key] ?? categoryPalette.servicios;
+    stops.push(`${palette.css} ${cursor}% ${cursor + share}%`);
+    cursor += share;
+  });
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-6">
+      <div role="img" aria-label={`${centerLabel}: ${centerValue}`} className="grid size-40 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(${stops.join(", ")})` }}>
+        <div className="grid size-24 place-items-center rounded-full bg-card text-center">
+          <span><strong className="block font-display text-xl text-primary">{centerValue}</strong><span className="text-xs text-muted-foreground">{centerLabel}</span></span>
+        </div>
+      </div>
+      <dl className="grid gap-3 text-sm">
+        {ordered.map((segment) => {
+          const palette = categoryPalette[segment.key] ?? categoryPalette.servicios;
+          return <ChannelLegend key={segment.key} color={palette.dot} label={palette.label} count={formatCurrency(segment.value)} />;
+        })}
+      </dl>
+    </div>
+  );
+}
+
 function AdminOverview({
   leads,
   contacts,
   messages,
+  purchases,
+  appointments,
+  appointmentSlots,
 }: {
   leads: CrmLead[];
   contacts: ContactRecord[];
   messages: ContactMessage[];
+  purchases: CustomerPurchase[];
+  appointments: Appointment[];
+  appointmentSlots: AppointmentSlot[];
 }) {
   const filter = useDateFilter();
+  const now = new Date();
   const currentLeads = leads.filter((lead) => inBounds(lead.createdAt, filter.range));
   const previousLeads = leads.filter((lead) => inBounds(lead.createdAt, filter.previous));
   const currentContacts = contacts.filter((contact) => inBounds(contact.createdAt, filter.range));
+  const previousContacts = contacts.filter((contact) => inBounds(contact.createdAt, filter.previous));
   const currentMessages = messages.filter((message) => inBounds(message.createdAt, filter.range));
   const pendingMessages = currentMessages.filter((message) => message.status === "nuevo" || message.status === "leído").length;
   const orders = currentLeads.filter((lead) => lead.type === "order");
-  const appointments = currentLeads.filter((lead) => lead.type === "appointment");
-  const buckets = useMemo(() => {
-    if (!filter.range) return [];
-    const dayCount = Math.max(1, Math.round((filter.range.end.getTime() - filter.range.start.getTime()) / 86_400_000));
-    const bucketDays = Math.max(1, Math.ceil(dayCount / 14));
-    return Array.from({ length: Math.ceil(dayCount / bucketDays) }, (_, index) => {
-      const start = addDays(filter.range!.start, index * bucketDays);
-      const end = new Date(Math.min(addDays(start, bucketDays).getTime(), filter.range!.end.getTime()));
-      const count = currentLeads.filter((lead) => inBounds(lead.createdAt, { start, end })).length;
-      const label = start.toLocaleDateString("es-PE", { day: "2-digit", month: "short" });
-      return { label, count };
+  const legacyAppointmentRequests = currentLeads.filter((lead) => lead.type === "appointment");
+
+  // --- Analítica comercial: ventas e ingresos reales (petcare_purchases) ---
+  const currentPurchases = useMemo(() => purchases.filter((purchase) => inBounds(purchase.createdAt, filter.range)), [purchases, filter.range]);
+  const previousPurchases = useMemo(() => purchases.filter((purchase) => inBounds(purchase.createdAt, filter.previous)), [purchases, filter.previous]);
+  const ingresos = currentPurchases.reduce((sum, purchase) => sum + purchase.total, 0);
+  const ingresosPrev = previousPurchases.reduce((sum, purchase) => sum + purchase.total, 0);
+  const ventas = currentPurchases.length;
+  const ventasPrev = previousPurchases.length;
+  const ticketPromedio = ventas ? ingresos / ventas : 0;
+  const ticketPromedioPrev = ventasPrev ? ingresosPrev / ventasPrev : 0;
+  const demoPurchaseCount = currentPurchases.filter((purchase) => purchase.recordedBy.startsWith("Datos de demostración")).length;
+
+  const contactsWithLeadCurrent = new Set(currentLeads.map((lead) => lead.contactId));
+  const contactsWithPurchaseCurrent = new Set(currentPurchases.map((purchase) => purchase.contactId));
+  const contactsWithLeadPrev = new Set(previousLeads.map((lead) => lead.contactId));
+  const contactsWithPurchasePrev = new Set(previousPurchases.map((purchase) => purchase.contactId));
+  const conversionRate = contactsWithLeadCurrent.size ? (contactsWithPurchaseCurrent.size / contactsWithLeadCurrent.size) * 100 : null;
+  const conversionRatePrev = contactsWithLeadPrev.size ? (contactsWithPurchasePrev.size / contactsWithLeadPrev.size) * 100 : null;
+
+  const recurringCustomersCurrent = filter.range
+    ? [...contactsWithPurchaseCurrent].filter((contactId) => purchases.some((purchase) => purchase.contactId === contactId && new Date(purchase.createdAt) < filter.range!.start)).length
+    : 0;
+  const recurringCustomersPrev = filter.previous
+    ? [...contactsWithPurchasePrev].filter((contactId) => purchases.some((purchase) => purchase.contactId === contactId && new Date(purchase.createdAt) < filter.previous!.start)).length
+    : 0;
+
+  // --- Analítica de citas (petcare_leads tipo "appointment" + petcare_appointment_slots) ---
+  const currentAppointments = useMemo(() => appointments.filter((appointment) => inBounds(appointment.createdAt, filter.range)), [appointments, filter.range]);
+  const scheduledIn = (appointment: Appointment, bounds: DateBounds | null) => Boolean(appointment.scheduledAt && inBounds(appointment.scheduledAt, bounds));
+  const confirmedCurrent = appointments.filter((appointment) => (appointment.status === "qualified" || appointment.status === "closed") && scheduledIn(appointment, filter.range));
+  const confirmedPrev = appointments.filter((appointment) => (appointment.status === "qualified" || appointment.status === "closed") && scheduledIn(appointment, filter.previous));
+  const attendedCurrent = appointments.filter((appointment) => appointment.status === "closed" && scheduledIn(appointment, filter.range));
+  const attendedPrev = appointments.filter((appointment) => appointment.status === "closed" && scheduledIn(appointment, filter.previous));
+  const noShowCurrent = appointments.filter((appointment) => appointment.status === "qualified" && appointment.scheduledAt && new Date(appointment.scheduledAt) < now && scheduledIn(appointment, filter.range));
+  const noShowPrev = appointments.filter((appointment) => appointment.status === "qualified" && appointment.scheduledAt && new Date(appointment.scheduledAt) < now && scheduledIn(appointment, filter.previous));
+  const attendanceBaseCurrent = attendedCurrent.length + noShowCurrent.length;
+  const attendanceBasePrev = attendedPrev.length + noShowPrev.length;
+  const attendanceRate = attendanceBaseCurrent ? (attendedCurrent.length / attendanceBaseCurrent) * 100 : null;
+  const attendanceRatePrev = attendanceBasePrev ? (attendedPrev.length / attendanceBasePrev) * 100 : null;
+  const cancelledCurrent = appointmentSlots.filter((slot) => slot.status === "cancelled" && inBounds(slot.startsAt, filter.range));
+
+  // --- Series por periodo ---
+  const revenueBuckets = useMemo(
+    () => bucketRanges(filter.range).map((bucket) => ({ label: bucket.label, value: purchases.filter((purchase) => inBounds(purchase.createdAt, bucket)).reduce((sum, purchase) => sum + purchase.total, 0) })),
+    [purchases, filter.range],
+  );
+  const appointmentDemandBuckets = useMemo(
+    () => bucketRanges(filter.range).map((bucket) => ({ label: bucket.label, value: appointments.filter((appointment) => inBounds(appointment.createdAt, bucket)).length })),
+    [appointments, filter.range],
+  );
+  const customerBuckets = useMemo(
+    () => bucketRanges(filter.range).map((bucket) => {
+      const newCount = contacts.filter((contact) => inBounds(contact.createdAt, bucket)).length;
+      const purchasersInBucket = new Set(purchases.filter((purchase) => inBounds(purchase.createdAt, bucket)).map((purchase) => purchase.contactId));
+      let recurringCount = 0;
+      purchasersInBucket.forEach((contactId) => {
+        if (purchases.some((purchase) => purchase.contactId === contactId && new Date(purchase.createdAt) < bucket.start)) recurringCount += 1;
+      });
+      return { label: bucket.label, a: newCount, b: recurringCount };
+    }),
+    [contacts, purchases, filter.range],
+  );
+  const weekdayLabels = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const demandByWeekday = useMemo(() => {
+    const counts = new Array(7).fill(0);
+    appointments.forEach((appointment) => {
+      if (scheduledIn(appointment, filter.range)) counts[new Date(appointment.scheduledAt as string).getDay()] += 1;
     });
-  }, [currentLeads, filter.range]);
-  const maxBucketCount = Math.max(1, ...buckets.map((bucket) => bucket.count));
-  const change = previousLeads.length > 0
-    ? `${Math.round(((currentLeads.length - previousLeads.length) / previousLeads.length) * 100)}%`
-    : currentLeads.length > 0 ? "Sin base anterior" : "Sin actividad";
-  const changeTone = currentLeads.length > previousLeads.length ? "text-accent" : currentLeads.length < previousLeads.length ? "text-muted-foreground" : "text-muted-foreground";
+    return weekdayLabels.map((label, index) => ({ label, value: counts[index] }));
+  }, [appointments, filter.range]);
+  const demandByHour = useMemo(() => {
+    const counts = new Array(24).fill(0);
+    appointments.forEach((appointment) => {
+      if (scheduledIn(appointment, filter.range)) counts[new Date(appointment.scheduledAt as string).getHours()] += 1;
+    });
+    return Array.from({ length: 13 }, (_, index) => index + 8).map((hour) => ({ label: `${hour}:00`, value: counts[hour] }));
+  }, [appointments, filter.range]);
+
+  // --- Rankings ---
+  const categoryTotals = new Map<string, number>();
+  const productTotals = new Map<string, number>();
+  currentPurchases.forEach((purchase) => {
+    purchase.items.forEach((item) => {
+      const revenue = item.unitPrice * item.quantity;
+      productTotals.set(item.name, (productTotals.get(item.name) ?? 0) + revenue);
+      const category = item.productId !== null ? productCategoryById.get(item.productId) : undefined;
+      const key = category ?? "servicios";
+      categoryTotals.set(key, (categoryTotals.get(key) ?? 0) + revenue);
+    });
+  });
+  const topProducts = [...productTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value }));
+  const serviceCounts = new Map<string, number>();
+  currentAppointments.forEach((appointment) => {
+    if (appointment.service) serviceCounts.set(appointment.service, (serviceCounts.get(appointment.service) ?? 0) + 1);
+  });
+  const topServices = [...serviceCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value }));
+  const funnelStages = [
+    { label: "Solicitud recibida", value: currentLeads.length },
+    { label: "Contactado", value: currentLeads.filter((lead) => lead.status === "contacted" || lead.status === "qualified" || lead.status === "closed").length },
+    { label: "Calificado / cita confirmada", value: currentLeads.filter((lead) => lead.status === "qualified" || lead.status === "closed").length },
+    { label: "Venta o servicio cerrado", value: currentLeads.filter((lead) => lead.status === "closed").length },
+  ];
 
   return (
-    <section className="space-y-6" aria-labelledby="admin-dashboard-heading">
+    <section className="space-y-8" aria-labelledby="admin-dashboard-heading">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 id="admin-dashboard-heading" className="font-display text-2xl font-black text-primary">Resumen de actividad</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Datos del CRM; las solicitudes de pedido no representan ventas pagadas.</p>
+          <h2 id="admin-dashboard-heading" className="font-display text-2xl font-black text-primary">Centro de inteligencia de negocio</h2>
+          <p className="mt-1 text-sm text-muted-foreground">KPIs, analítica comercial y de citas calculados sobre registros reales de Neon.</p>
         </div>
         <PeriodFilter filter={filter} />
       </div>
       {!filter.range && <p role="alert" className="rounded-xl bg-danger/5 px-4 py-3 text-sm text-danger">El rango personalizado no es válido. Selecciona fechas correctas.</p>}
       <p className="text-xs text-muted-foreground">Periodo: {rangeDescription(filter.range)} · Comparación: periodo anterior de igual duración.</p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Solicitudes recibidas" value={filter.range ? currentLeads.length : "—"} tone="accent" />
-        <StatCard label="Pedidos iniciados (no pagados)" value={filter.range ? orders.length : "—"} tone="green" />
-        <StatCard label="Citas solicitadas" value={filter.range ? appointments.length : "—"} tone="navy" />
-        <StatCard label="Contactos nuevos" value={filter.range ? currentContacts.length : "—"} tone="sky" />
-      </div>
-      <section className="rounded-media border border-border bg-card p-5 shadow-soft" aria-labelledby="leads-chart-heading">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 id="leads-chart-heading" className="font-display text-lg font-black text-primary">Solicitudes a lo largo del tiempo</h3>
-            <p className="text-sm text-muted-foreground">Solicitudes capturadas en el CRM; no es un gráfico de ventas.</p>
-          </div>
-          <p className={cn("text-sm font-bold", changeTone)}>{change} vs. periodo anterior</p>
+      {demoPurchaseCount > 0 && (
+        <p className="rounded-xl bg-accent-soft px-4 py-3 text-sm font-semibold text-accent">
+          {demoPurchaseCount} de las {ventas} ventas de este periodo son datos de demostración sembrados para validar el dashboard (aún no hay un flujo de pago en línea en producción). Los cálculos de abajo las tratan igual que una venta real.
+        </p>
+      )}
+
+      {/* A. KPIs ejecutivos */}
+      <section aria-labelledby="kpi-heading" className="space-y-4">
+        <h3 id="kpi-heading" className="font-display text-lg font-black text-primary">KPIs principales</h3>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard label="Ingresos totales" value={filter.range ? formatCurrency(ingresos) : "—"} change={filter.range ? percentChange(ingresos, ingresosPrev) : null} description="Importe realmente percibido por ventas y servicios registrados en Caja (petcare_purchases)." />
+          <KpiCard label="Ventas realizadas" value={filter.range ? ventas : "—"} change={filter.range ? percentChange(ventas, ventasPrev) : null} description="Cantidad de operaciones de venta pagadas y registradas en el periodo." />
+          <KpiCard label="Ticket promedio" value={filter.range ? formatCurrency(ticketPromedio) : "—"} change={filter.range ? percentChange(ticketPromedio, ticketPromedioPrev) : null} description="Ingreso promedio por operación (ingresos ÷ ventas realizadas)." />
+          <KpiCard
+            label="Tasa de conversión"
+            value={filter.range ? (conversionRate === null ? "Sin datos" : `${conversionRate.toFixed(1)}%`) : "—"}
+            change={filter.range && conversionRate !== null ? percentChange(conversionRate, conversionRatePrev ?? 0) : null}
+            description="Contactos con al menos una compra ÷ contactos con al menos una solicitud, en el periodo."
+          />
+          <KpiCard label="Citas confirmadas" value={filter.range ? confirmedCurrent.length : "—"} change={filter.range ? percentChange(confirmedCurrent.length, confirmedPrev.length) : null} description="Citas con fecha y hora acordadas (estado calificado o cerrado), por fecha de la cita." />
+          <KpiCard
+            label="Tasa de asistencia"
+            value={filter.range ? (attendanceRate === null ? "Sin datos" : `${attendanceRate.toFixed(1)}%`) : "—"}
+            change={filter.range && attendanceRate !== null ? percentChange(attendanceRate, attendanceRatePrev ?? 0) : null}
+            description="Citas atendidas ÷ (atendidas + no asistidas) entre las citas confirmadas cuya fecha ya pasó."
+          />
+          <KpiCard label="Clientes nuevos" value={filter.range ? currentContacts.length : "—"} change={filter.range ? percentChange(currentContacts.length, previousContacts.length) : null} description="Contactos registrados por primera vez durante el periodo." />
+          <KpiCard label="Clientes recurrentes" value={filter.range ? recurringCustomersCurrent : "—"} change={filter.range ? percentChange(recurringCustomersCurrent, recurringCustomersPrev) : null} description="Clientes que compraron en el periodo y que ya tenían al menos una compra anterior." />
         </div>
-        {currentLeads.length === 0 ? (
-          <EmptyState title="Sin solicitudes en este periodo" description="Cuando se reciban solicitudes de cita o pedidos, su evolución aparecerá aquí." />
-        ) : (
-          <div role="img" aria-label={`Solicitudes capturadas durante ${rangeDescription(filter.range)}`} className="mt-5 flex min-h-56 items-end gap-2 overflow-x-auto border-b border-border px-1">
-            {buckets.map((bucket, index) => (
-              <div key={`${bucket.label}-${index}`} title={`${bucket.label}: ${bucket.count} solicitudes`}
-                className="flex h-52 min-w-8 flex-1 flex-col items-center justify-end gap-2">
-                <span className="text-xs font-bold text-muted-foreground">{bucket.count || ""}</span>
-                <div className="w-full max-w-10 rounded-t-lg bg-accent transition-[height]"
-                  style={{ height: `${Math.max(bucket.count ? 8 : 2, bucket.count / maxBucketCount * 100)}%` }} />
-                <span className="whitespace-nowrap text-[0.65rem] text-muted-foreground">{bucket.label}</span>
+      </section>
+
+      {/* B. Analítica comercial */}
+      <section aria-labelledby="commercial-heading" className="space-y-4">
+        <h3 id="commercial-heading" className="font-display text-lg font-black text-primary">Analítica comercial</h3>
+        <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Evolución de ingresos</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Ingresos reales agrupados por periodo · {rangeDescription(filter.range)}</p>
+            <div className="mt-5"><MiniLineChart buckets={revenueBuckets} ariaLabel="Evolución de ingresos" valueFormatter={formatCurrency} /></div>
+          </article>
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Comparación de periodos</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Actual vs. periodo anterior</p>
+            <div className="mt-5 space-y-4">
+              <div>
+                <div className="mb-1.5 flex justify-between text-sm"><span>Ingresos actuales</span><strong className="tabular-nums">{formatCurrency(ingresos)}</strong></div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, (ingresos / Math.max(1, ingresos, ingresosPrev)) * 100)}%` }} /></div>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
-      <section className="overflow-hidden rounded-media border border-border bg-card shadow-soft" aria-labelledby="recent-leads-heading">
-        <div className="border-b border-border p-5">
-          <h3 id="recent-leads-heading" className="font-display text-lg font-black text-primary">Solicitudes recientes</h3>
+              <div>
+                <div className="mb-1.5 flex justify-between text-sm"><span>Ingresos periodo anterior</span><strong className="tabular-nums">{formatCurrency(ingresosPrev)}</strong></div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (ingresosPrev / Math.max(1, ingresos, ingresosPrev)) * 100)}%` }} /></div>
+              </div>
+              <div className="border-t border-border pt-4">
+                <div className="mb-1.5 flex justify-between text-sm"><span>Ventas actuales</span><strong className="tabular-nums">{ventas}</strong></div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-brand-navy" style={{ width: `${Math.min(100, (ventas / Math.max(1, ventas, ventasPrev)) * 100)}%` }} /></div>
+              </div>
+              <div>
+                <div className="mb-1.5 flex justify-between text-sm"><span>Ventas periodo anterior</span><strong className="tabular-nums">{ventasPrev}</strong></div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (ventasPrev / Math.max(1, ventas, ventasPrev)) * 100)}%` }} /></div>
+              </div>
+            </div>
+          </article>
         </div>
-        {currentLeads.length === 0 ? (
-          <EmptyState title="Aún no hay actividad" description="Las solicitudes registradas aparecerán aquí." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-muted/60 text-muted-foreground"><tr>
-                <th className="px-4 py-3 font-semibold">Contacto</th><th className="px-4 py-3 font-semibold">Tipo</th>
-                <th className="px-4 py-3 font-semibold">Estado</th><th className="px-4 py-3 font-semibold">Fecha</th>
-              </tr></thead>
-              <tbody>{[...currentLeads].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 5).map((lead) => (
-                <tr key={lead.id} className="border-t border-border">
-                  <td className="px-4 py-3"><span className="font-semibold">{lead.owner}</span><span className="block text-muted-foreground">{lead.email}</span></td>
-                  <td className="px-4 py-3">{typeLabels[lead.type]}{lead.type === "order" ? " · solicitud" : ""}</td>
-                  <td className="px-4 py-3">{statusLabels[lead.status]}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDate(lead.createdAt)}</td>
-                </tr>
-              ))}</tbody>
-            </table>
+        <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Ingresos por categoría</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Productos y servicios vendidos en el periodo</p>
+            <div className="mt-5"><CategoryDonut segments={[...categoryTotals.entries()].map(([key, value]) => ({ key, value }))} centerLabel="ingresos" centerValue={formatCurrency(ingresos)} /></div>
+          </article>
+          <div className="grid gap-4">
+            <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+              <h4 className="font-display text-base font-black text-primary">Productos más vendidos</h4>
+              <div className="mt-4"><MiniBarList items={topProducts} valueFormatter={formatCurrency} emptyLabel="Las ventas de productos aparecerán aquí." /></div>
+            </article>
+            <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+              <h4 className="font-display text-base font-black text-primary">Servicios veterinarios más solicitados</h4>
+              <div className="mt-4"><MiniBarList items={topServices} emptyLabel="Las citas solicitadas por servicio aparecerán aquí." /></div>
+            </article>
           </div>
-        )}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Clientes nuevos vs. recurrentes</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Azul marino: nuevos · Verde: recurrentes</p>
+            <div className="mt-5"><StackedBars buckets={customerBuckets} ariaLabel="Clientes nuevos vs. recurrentes por periodo" /></div>
+          </article>
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Embudo de conversión</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Desde la solicitud hasta la venta o servicio cerrado</p>
+            <div className="mt-5"><ConversionFunnel stages={funnelStages} /></div>
+          </article>
+        </div>
       </section>
-      <p className="text-sm text-muted-foreground">Mensajes pendientes de este periodo: <strong className="text-foreground">{filter.range ? pendingMessages : "—"}</strong>. Ingresos, ticket promedio, inventario, visitas y tasa de conversión no están disponibles en las fuentes conectadas.</p>
+
+      {/* C. Analítica de citas y servicios */}
+      <section aria-labelledby="appointments-analytics-heading" className="space-y-4">
+        <h3 id="appointments-analytics-heading" className="font-display text-lg font-black text-primary">Analítica de citas y servicios</h3>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard label="Citas solicitadas" value={filter.range ? currentAppointments.length : "—"} tone="accent" />
+          <StatCard label="Confirmadas" value={filter.range ? confirmedCurrent.length : "—"} tone="navy" />
+          <StatCard label="Atendidas" value={filter.range ? attendedCurrent.length : "—"} tone="green" />
+          <StatCard label="Canceladas" value={filter.range ? cancelledCurrent.length : "—"} tone="sky" />
+          <div className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <p className="text-sm font-semibold text-muted-foreground">Tasa de inasistencia</p>
+            <p className="mt-3 font-display text-3xl font-black text-primary">{filter.range ? (attendanceRate === null ? "—" : `${(100 - attendanceRate).toFixed(1)}%`) : "—"}</p>
+          </div>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Demanda por día de la semana</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Citas con fecha y hora confirmada, por día programado</p>
+            <div className="mt-5">{demandByWeekday.every((bucket) => bucket.value === 0) ? <EmptyState title="Sin citas programadas" description="Cuando haya citas con fecha confirmada en el periodo, su distribución semanal aparecerá aquí." /> : <VerticalBars bars={demandByWeekday} ariaLabel="Demanda de citas por día de la semana" tone="bg-brand-navy" />}</div>
+          </article>
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Demanda por horario</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Horario de atención (8:00 – 20:00)</p>
+            <div className="mt-5">{demandByHour.every((bucket) => bucket.value === 0) ? <EmptyState title="Sin citas programadas" description="Cuando haya citas con fecha confirmada en el periodo, su distribución por hora aparecerá aquí." /> : <VerticalBars bars={demandByHour} ariaLabel="Demanda de citas por horario" tone="bg-accent" />}</div>
+          </article>
+        </div>
+        <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+          <h4 className="font-display text-base font-black text-primary">Evolución de la demanda de servicios</h4>
+          <p className="mt-1 text-sm text-muted-foreground">Citas solicitadas por periodo (fecha de solicitud) · {rangeDescription(filter.range)}</p>
+          <div className="mt-5"><MiniLineChart buckets={appointmentDemandBuckets} ariaLabel="Evolución de la demanda de citas" /></div>
+        </article>
+      </section>
+
+      {/* Contenido existente: actividad de solicitudes del CRM (se mantiene, sin cambios de cálculo) */}
+      <section aria-labelledby="crm-activity-heading" className="space-y-4 border-t border-border pt-6">
+        <div>
+          <h3 id="crm-activity-heading" className="font-display text-lg font-black text-primary">Actividad de solicitudes (CRM)</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Panel original: solicitudes recibidas en el CRM; las solicitudes de pedido no representan ventas pagadas.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Solicitudes recibidas" value={filter.range ? currentLeads.length : "—"} tone="accent" />
+          <StatCard label="Pedidos iniciados (no pagados)" value={filter.range ? orders.length : "—"} tone="green" />
+          <StatCard label="Citas solicitadas" value={filter.range ? legacyAppointmentRequests.length : "—"} tone="navy" />
+          <StatCard label="Contactos nuevos" value={filter.range ? currentContacts.length : "—"} tone="sky" />
+        </div>
+        <section className="overflow-hidden rounded-media border border-border bg-card shadow-soft" aria-labelledby="recent-leads-heading">
+          <div className="border-b border-border p-5">
+            <h4 id="recent-leads-heading" className="font-display text-base font-black text-primary">Solicitudes recientes</h4>
+          </div>
+          {currentLeads.length === 0 ? (
+            <EmptyState title="Aún no hay actividad" description="Las solicitudes registradas aparecerán aquí." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-muted/60 text-muted-foreground"><tr>
+                  <th className="px-4 py-3 font-semibold">Contacto</th><th className="px-4 py-3 font-semibold">Tipo</th>
+                  <th className="px-4 py-3 font-semibold">Estado</th><th className="px-4 py-3 font-semibold">Fecha</th>
+                </tr></thead>
+                <tbody>{[...currentLeads].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 5).map((lead) => (
+                  <tr key={lead.id} className="border-t border-border">
+                    <td className="px-4 py-3"><span className="font-semibold">{lead.owner}</span><span className="block text-muted-foreground">{lead.email}</span></td>
+                    <td className="px-4 py-3">{typeLabels[lead.type]}{lead.type === "order" ? " · solicitud" : ""}</td>
+                    <td className="px-4 py-3">{statusLabels[lead.status]}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{formatDate(lead.createdAt)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        <p className="text-sm text-muted-foreground">Mensajes pendientes de este periodo: <strong className="text-foreground">{filter.range ? pendingMessages : "—"}</strong>.</p>
+      </section>
     </section>
   );
 }
