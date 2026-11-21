@@ -156,7 +156,7 @@ export function SocialMediaManager({ token }: { token: string; oauthState?: stri
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!content.trim() || selectedChannelIds.length === 0) return;
-    if (postType !== "draft" && !scheduleDate) {
+    if (postType === "schedule" && !scheduleDate) {
       setError("Elige la fecha y hora de la publicación.");
       return;
     }
@@ -168,7 +168,7 @@ export function SocialMediaManager({ token }: { token: string; oauthState?: stri
         content: content.trim(),
         channelIds: selectedChannelIds,
         type: postType,
-        date: postType === "draft" ? undefined : new Date(scheduleDate).toISOString(),
+        date: postType === "schedule" ? new Date(scheduleDate).toISOString() : undefined,
         attachments,
       });
       setNotice(postType === "now" ? "Publicación enviada a Postiz." : postType === "schedule" ? "Publicación programada." : "Borrador guardado.");
