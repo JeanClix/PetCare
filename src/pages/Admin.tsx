@@ -1092,7 +1092,7 @@ function MiniLineChart({
   const format = valueFormatter ?? ((value: number) => String(value));
   return (
     <div>
-      <svg role="img" aria-label={ariaLabel} viewBox="0 0 660 210" className="h-56 w-full overflow-visible">
+      <svg role="img" aria-label={ariaLabel} viewBox="0 0 660 210" preserveAspectRatio="none" className="h-56 w-full overflow-visible">
         <title>{ariaLabel}</title>
         {[30, 75, 120, 172].map((y) => <line key={y} x1="20" y1={y} x2="640" y2={y} stroke="var(--color-border)" strokeDasharray="4 5" />)}
         <path d={`${path} L${points.at(-1)?.x ?? 24},172 L${points[0]?.x ?? 24},172 Z`} fill="var(--color-accent)" opacity="0.11" />
@@ -1428,7 +1428,7 @@ function AdminOverview({
             </div>
           </article>
         </div>
-        <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr]">
           <article className="rounded-media border border-border bg-card p-5 shadow-soft">
             <h4 className="font-display text-base font-black text-primary">Ingresos por categoría</h4>
             <p className="mt-1 text-sm text-muted-foreground">Productos y servicios vendidos en el periodo</p>
