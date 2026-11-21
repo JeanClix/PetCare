@@ -139,6 +139,16 @@
     @apply outline-2 outline-offset-2 outline-ring;
   }
 
+  /* Los botones cambian el cursor del ratón en hover */
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"]:disabled {
+    cursor: not-allowed;
+  }
+
   /* Selects nativos: quitamos la flecha del sistema operativo y dibujamos
      una propia, consistente con el resto de los controles del sitio. */
   select {

@@ -68,7 +68,7 @@ type AdminView = "dashboard" | "leads" | "purchases" | "contacts" | "accounts" |
 const adminViews: Record<AdminView, { label: string; description: string; icon: typeof Gauge; roles: StaffRole[] }> = {
   dashboard: { label: "Dashboard", description: "Resumen de solicitudes, contactos y mensajes guardados en Neon.", icon: Gauge, roles: ["admin", "sales"] },
   leads: { label: "Pedidos y solicitudes", description: "Pedidos hechos desde la tienda online y solicitudes de cita capturadas en la web.", icon: ClipboardText, roles: ["admin", "sales"] },
-  purchases: { label: "Compras por cliente", description: "Para ventas que NO pasaron por la tienda online (en el local, por teléfono o WhatsApp): regístralas aquí para que queden en el historial del cliente.", icon: Receipt, roles: ["admin", "sales"] },
+  purchases: { label: "Compras por cliente", description: "Para ventas que NO pasaron por la tienda online (en el local, por teléfono o WhatsApp): regístralas aquí para que queden en el historial del cliente.", icon: Receipt, roles: [] },
   contacts: { label: "Clientes y contactos", description: "Contactos del CRM, etapa del ciclo de vida y consentimiento.", icon: Users, roles: ["admin", "sales"] },
   messages: { label: "Mensajes", description: "Mensajes recibidos desde formularios y WhatsApp.", icon: ChatCircleDots, roles: ["admin", "sales"] },
   marketing: { label: "Email marketing", description: "Campañas por segmento con consentimiento verificado.", icon: EnvelopeSimple, roles: ["admin", "sales"] },
@@ -85,7 +85,7 @@ const adminViews: Record<AdminView, { label: string; description: string; icon: 
 
 const adminSections: Array<{ label: string; views: AdminView[] }> = [
   { label: "General", views: ["dashboard"] },
-  { label: "Ventas", views: ["leads", "purchases", "contacts", "messages"] },
+  { label: "Ventas", views: ["leads", "contacts", "messages"] },
   { label: "Clínica", views: ["appointments", "availability", "patients"] },
   { label: "Marketing", views: ["marketing", "social", "analytics", "recommendations"] },
   { label: "Administración", views: ["accounts", "whatsapp", "site"] },
@@ -302,7 +302,7 @@ function AdminDashboard({ onLogout, user }: { onLogout: () => void; user: AuthUs
     }))
     .filter((section) => section.items.length > 0);
   const current = adminViews[activeView];
-  const showsCrmToolbar = activeView === "leads" || activeView === "purchases" || activeView === "contacts" || activeView === "messages";
+  const showsCrmToolbar = activeView === "leads" || activeView === "contacts" || activeView === "messages";
 
   if (activeView === "site") {
     return <VisualSiteEditor token={token} onExit={() => setActiveView(canReadCrm ? "dashboard" : "appointments")} />;
