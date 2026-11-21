@@ -1428,22 +1428,20 @@ function AdminOverview({
             </div>
           </article>
         </div>
-        <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr]">
+        <div className="grid items-start gap-4 xl:grid-cols-3">
           <article className="rounded-media border border-border bg-card p-5 shadow-soft">
             <h4 className="font-display text-base font-black text-primary">Ingresos por categoría</h4>
             <p className="mt-1 text-sm text-muted-foreground">Productos y servicios vendidos en el periodo</p>
             <div className="mt-5"><CategoryDonut segments={[...categoryTotals.entries()].map(([key, value]) => ({ key, value }))} centerLabel="ingresos" centerValue={formatCurrency(ingresos)} /></div>
           </article>
-          <div className="grid gap-4">
-            <article className="rounded-media border border-border bg-card p-5 shadow-soft">
-              <h4 className="font-display text-base font-black text-primary">Productos más vendidos</h4>
-              <div className="mt-4"><MiniBarList items={topProducts} valueFormatter={formatCurrency} emptyLabel="Las ventas de productos aparecerán aquí." /></div>
-            </article>
-            <article className="rounded-media border border-border bg-card p-5 shadow-soft">
-              <h4 className="font-display text-base font-black text-primary">Servicios veterinarios más solicitados</h4>
-              <div className="mt-4"><MiniBarList items={topServices} emptyLabel="Las citas solicitadas por servicio aparecerán aquí." /></div>
-            </article>
-          </div>
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Productos más vendidos</h4>
+            <div className="mt-4"><MiniBarList items={topProducts} valueFormatter={formatCurrency} emptyLabel="Las ventas de productos aparecerán aquí." /></div>
+          </article>
+          <article className="rounded-media border border-border bg-card p-5 shadow-soft">
+            <h4 className="font-display text-base font-black text-primary">Servicios veterinarios más solicitados</h4>
+            <div className="mt-4"><MiniBarList items={topServices} emptyLabel="Las citas solicitadas por servicio aparecerán aquí." /></div>
+          </article>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           <article className="rounded-media border border-border bg-card p-5 shadow-soft">
